@@ -27,6 +27,10 @@ public static class Converter
         if (archives)
             return await ArchiveOps.PackAsync(ctx.Inputs, target, f => ctx.Report(0, f), ctx.Ct);
 
+        // Several photos dropped on PDF are meant to become one document, one photo per page.
+        if (target == "pdf" && ctx.Inputs.Count > 1 && ctx.Inputs.All(p => FileKinds.Detect(p) == FileCategory.Image))
+            return [await ImageOps.CombineToPdfAsync(ctx.Inputs, f => ctx.Report(0, f), ctx.Ct)];
+
         var outputs = new List<string>();
         for (int i = 0; i < ctx.Inputs.Count; i++)
         {

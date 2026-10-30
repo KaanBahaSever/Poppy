@@ -82,6 +82,39 @@ public static class OutputPaths
     }
 }
 
+/// <summary>Orders "photo2" before "photo10", the way File Explorer does.</summary>
+public sealed class NaturalComparer : IComparer<string>
+{
+    public static readonly NaturalComparer Instance = new();
+
+    public int Compare(string? a, string? b)
+    {
+        if (a == null || b == null) return string.Compare(a, b, StringComparison.Ordinal);
+        int i = 0, j = 0;
+        while (i < a.Length && j < b.Length)
+        {
+            if (char.IsDigit(a[i]) && char.IsDigit(b[j]))
+            {
+                int si = i, sj = j;
+                while (i < a.Length && char.IsDigit(a[i])) i++;
+                while (j < b.Length && char.IsDigit(b[j])) j++;
+                var na = a[si..i].TrimStart('0');
+                var nb = b[sj..j].TrimStart('0');
+                var c = na.Length != nb.Length ? na.Length.CompareTo(nb.Length) : string.CompareOrdinal(na, nb);
+                if (c != 0) return c;
+            }
+            else
+            {
+                var c = string.Compare(a[i].ToString(), b[j].ToString(), StringComparison.CurrentCultureIgnoreCase);
+                if (c != 0) return c;
+                i++;
+                j++;
+            }
+        }
+        return (a.Length - i).CompareTo(b.Length - j);
+    }
+}
+
 /// <summary>A scratch folder that is deleted when disposed.</summary>
 public sealed class TempDir : IDisposable
 {

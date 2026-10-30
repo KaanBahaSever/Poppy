@@ -66,7 +66,7 @@ Windows 10 (2004) or Windows 11, x64. FFmpeg (LGPL build) is bundled, so video a
 | Subtitles (SRT, VTT, ASS) | SRT · VTT · ASS · TXT |
 | Archive, folder, anything | ZIP · 7Z · TAR · TAR.GZ |
 
-When the codecs already fit, video is re-wrapped instead of re-encoded (MP4 → MKV takes a second).
+Several images dropped on **PDF** become one PDF, one image per page in name order. When the codecs already fit, video is re-wrapped instead of re-encoded (MP4 → MKV takes a second).
 
 ### Tools ring
 

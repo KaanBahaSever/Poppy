@@ -173,6 +173,47 @@ public static class ImageOps
         return output;
     }
 
+    /// <summary>
+    /// One PDF, one image per page, in natural name order (photo2 before photo10). Pages are A4
+    /// in the image's orientation, so the result prints like a scanned document.
+    /// </summary>
+    public static Task<string> CombineToPdfAsync(IReadOnlyList<string> inputs, Action<double>? progress, CancellationToken ct) => Task.Run(() =>
+    {
+        if (PdfSharp.Fonts.GlobalFontSettings.FontResolver == null) PdfSharp.Fonts.GlobalFontSettings.UseWindowsFontsUnderWindows = true;
+        var ordered = inputs.OrderBy(Path.GetFileName, NaturalComparer.Instance).ToList();
+        var output = OutputPaths.For(ordered[0], "pdf", "merged");
+        const double a4Short = 595.28, a4Long = 841.89, margin = 28; // points
+        using var doc = new PdfSharp.Pdf.PdfDocument();
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            byte[] jpeg;
+            uint w, h;
+            using (var img = Load(ordered[i]))
+            {
+                if (img.Width > 3000 || img.Height > 3000) img.Resize(new MagickGeometry(3000, 3000));
+                if (img.HasAlpha) { img.BackgroundColor = MagickColors.White; img.Alpha(AlphaAction.Remove); }
+                img.Quality = 90;
+                jpeg = img.ToByteArray(MagickFormat.Jpeg);
+                (w, h) = (img.Width, img.Height);
+            }
+            var page = doc.AddPage();
+            var landscape = w > h;
+            page.Width = PdfSharp.Drawing.XUnit.FromPoint(landscape ? a4Long : a4Short);
+            page.Height = PdfSharp.Drawing.XUnit.FromPoint(landscape ? a4Short : a4Long);
+            using var stream = new MemoryStream(jpeg);
+            using var x = PdfSharp.Drawing.XImage.FromStream(stream);
+            using var g = PdfSharp.Drawing.XGraphics.FromPdfPage(page);
+            double boxW = page.Width.Point - 2 * margin, boxH = page.Height.Point - 2 * margin;
+            var scale = Math.Min(boxW / w, boxH / h);
+            double dw = w * scale, dh = h * scale;
+            g.DrawImage(x, (page.Width.Point - dw) / 2, (page.Height.Point - dh) / 2, dw, dh);
+            progress?.Invoke((i + 1.0) / ordered.Count);
+        }
+        doc.Save(output);
+        return output;
+    }, ct);
+
     // ---------- Tools ----------
 
     /// <summary>Smaller file in the same format. Returns null if the image cannot get smaller.</summary>

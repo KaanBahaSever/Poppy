@@ -63,6 +63,47 @@ public class ConversionTests(ITestOutputHelper log)
     }
 
     [Fact]
+    public async Task SeveralImagesBecomeOnePdfInNameOrder()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "PoppyTests", "runs", Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        // Landscape, portrait, landscape, in a drop order that is not the name order.
+        void Make(string name, uint w, uint h, ImageMagick.MagickFormat f)
+        {
+            using var img = new ImageMagick.MagickImage(ImageMagick.MagickColors.Coral, w, h);
+            img.Write(Path.Combine(dir, name), f);
+        }
+        Make("photo10.webp", 400, 200, ImageMagick.MagickFormat.WebP);
+        Make("photo1.jpg", 400, 200, ImageMagick.MagickFormat.Jpeg);
+        Make("photo2.png", 200, 400, ImageMagick.MagickFormat.Png);
+        string[] dropped = ["photo10.webp", "photo1.jpg", "photo2.png"];
+
+        var result = await Runner.RunAsync("convert:pdf", new OpContext { Inputs = dropped.Select(n => Path.Combine(dir, n)).ToList() });
+
+        var pdf = Assert.Single(result.Outputs);
+        Assert.Equal(Path.Combine(dir, "photo1-merged.pdf"), pdf);
+        using var doc = PdfSharp.Pdf.IO.PdfReader.Open(pdf, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        Assert.Equal(3, doc.PageCount);
+        var landscape = doc.Pages.Cast<PdfSharp.Pdf.PdfPage>().Select(p => p.Width.Point > p.Height.Point).ToArray();
+        Assert.Equal([true, false, true], landscape); // photo1, photo2, photo10
+    }
+
+    [Fact]
+    public async Task OneImageStillBecomesItsOwnPdf()
+    {
+        var input = Samples.Copy("sample.png", out var dir);
+        var result = await Runner.RunAsync("convert:pdf", new OpContext { Inputs = [input] });
+        Assert.Equal(Path.Combine(dir, "sample.pdf"), Assert.Single(result.Outputs));
+    }
+
+    [Fact]
+    public void NaturalOrder()
+    {
+        string[] names = ["img10.jpg", "img2.jpg", "IMG1.jpg", "img02b.jpg", "a.jpg"];
+        Assert.Equal(["a.jpg", "IMG1.jpg", "img2.jpg", "img02b.jpg", "img10.jpg"], names.Order(NaturalComparer.Instance));
+    }
+
+    [Fact]
     public async Task NeverOverwritesExistingFiles()
     {
         var input = Samples.Copy("sample.png", out var dir);

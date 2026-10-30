@@ -1,11 +1,7 @@
-First release of Poppy 🌺
+Poppy 1.0.1 🌺
 
-Drag a file, tap a key, pick from the ring.
+- **Several images → one PDF.** Select photos, drag them, tap Shift and drop on PDF: you get a single PDF with one image per page (A4, in name order: photo2 comes before photo10). A single image still becomes its own PDF.
 
-- **Convert ring** (Shift): images, video, audio, PDF, documents, slides, spreadsheets, e-books, subtitles and archives
-- **Tools ring** (Ctrl): compress, trim, crop, edit, annotate, redact, resize, rotate, speed, normalize, merge/split/protect PDFs and more
-- **Actions ring** (Alt): share, floating shelf, copy, move, copy path, terminal, zip
-- English and Turkish UI, light and dark theme
-- Updates itself from GitHub Releases (applied when Poppy exits)
+Installed from Setup.exe? Poppy updates itself the next time it exits.
 
-**Install:** download `Poppy-win-Setup.exe` below, or `winget install KaanBahaSever.Poppy` once the winget package is approved.
+**Install:** download `Poppy-win-Setup.exe` below.
