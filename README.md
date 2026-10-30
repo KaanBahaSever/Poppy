@@ -122,6 +122,8 @@ Everything is built and tested locally; nothing runs on GitHub Actions (the two 
 
 It runs the tests, builds the installer, the delta update package and the Store MSIX (`build.ps1`), and publishes the GitHub release.
 
+The website lives in `site/index.html` and is served from the `gh-pages` branch, so pushes to `main` build nothing. `./deploy-site.ps1` updates that branch; `./deploy-site.ps1 -Push` publishes it.
+
 ### Project layout
 
 ```
