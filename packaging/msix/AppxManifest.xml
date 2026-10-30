@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Microsoft Store package. Identity Name and Publisher must match what Partner Center shows
+  after you reserve the app name (Product identity page); set them in packaging/store.json.
+  build.ps1 fills the $tokens$.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop rescap">
+
+  <Identity Name="$IdentityName$" Publisher="$Publisher$" Version="$Version$" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Poppy</DisplayName>
+    <PublisherDisplayName>$PublisherDisplayName$</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Drag a file, tap a key, pick from the ring: convert, compress, trim and share files without opening an app.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="tr-tr" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Poppy" Executable="Poppy.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Poppy"
+        Description="Drag a file, tap a key, pick from the ring."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\Square71x71Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#FFF4EE" />
+      </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="Poppy.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="PoppyStartup" Enabled="true" DisplayName="Poppy" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
