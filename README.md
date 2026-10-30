@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/KaanBahaSever/Poppy/actions/workflows/ci.yml"><img src="https://github.com/KaanBahaSever/Poppy/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/KaanBahaSever/Poppy/releases/latest"><img src="https://img.shields.io/github/v/release/KaanBahaSever/Poppy?color=ff5a36" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License"></a>
 </p>
@@ -115,7 +114,13 @@ dotnet run --project tests/Poppy.E2E -- src\Poppy\bin\Debug\net10.0-windows10.0.
 
 The end-to-end test drives real drag-and-drop with synthetic mouse and keyboard input, so don't touch the mouse while it runs.
 
-Release artifacts (installer, update feed, Store package and winget manifests) come from `./build.ps1 -Version x.y.z`. Pushing a `v*` tag does the same in GitHub Actions and publishes a release.
+Everything is built and tested locally; nothing runs on GitHub Actions (the two workflows exist only as a manual fallback). To ship a version: bump `<Version>` in `src/Poppy/Poppy.csproj`, write `docs/RELEASE_NOTES.md`, commit and push, then:
+
+```powershell
+./publish.ps1 -Version x.y.z
+```
+
+It runs the tests, builds the installer, the delta update package and the Store MSIX (`build.ps1`), and publishes the GitHub release.
 
 ### Project layout
 

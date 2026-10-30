@@ -1,9 +1,8 @@
 name: CI
 
+# Manual only: builds and tests run locally (dotnet test). Start it by hand from the Actions tab if ever needed.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:

@@ -1,8 +1,12 @@
 name: Release
 
+# Manual only: releases are built locally with ./publish.ps1. This is a fallback started by hand.
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (for example 1.0.5)
+        required: true
 
 permissions:
   contents: write
@@ -22,7 +26,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          $version = "${{ inputs.version }}"
           ./build.ps1 -Version $version
 
       - name: Publish GitHub release
@@ -30,11 +34,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag.TrimStart('v')
+          $version = "${{ inputs.version }}"
+          $tag = "v$version"
           # vpk publishes the installer, the full and delta packages and the update feed.
           vpk upload github --repoUrl "https://github.com/${{ github.repository }}" --token $env:GH_TOKEN `
-            -o artifacts/release --tag $tag --releaseName "Poppy $version" --publish
+            -o artifacts/release --tag $tag --releaseName "Poppy $version" --targetCommitish "${{ github.sha }}" --publish
           if ($LASTEXITCODE -ne 0) { throw "vpk upload failed" }
           gh release upload $tag (Get-ChildItem artifacts/release -Filter "*.msix").FullName --clobber
           gh release edit $tag --notes-file docs/RELEASE_NOTES.md
