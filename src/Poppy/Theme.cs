@@ -60,6 +60,7 @@ static class Theme
         d["WindowBg"] = Brush(Window);
         d["Card"] = Brush(Card);
         d["CardEdge"] = Brush(CardEdge);
+        d["HoverBg"] = Brush(Dark ? Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x14, 0x00, 0x00, 0x00));
         return d;
     }
 }

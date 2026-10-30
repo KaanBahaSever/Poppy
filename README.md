@@ -75,7 +75,7 @@ Several images dropped on **PDF** become one PDF, one image per page in name ord
 | Images | Compress · Metadata (strip EXIF/GPS) · Edit (brightness, contrast, saturation, rotate, flip, B&W) · Annotate (pen, highlighter, box, arrow) · Add background · Crop · Redact · Resize |
 | Video | Compress · Trim (waveform timeline) · Mute · Resize · Rotate · Frame (snapshot) · Speed · Metadata |
 | Audio | Compress · Trim · Normalize (EBU R128) · Mono · Fade · Speed · Metadata |
-| PDF | Compress · Merge · Split · Rotate · Extract pages · Protect (AES-256 password) · Metadata |
+| PDF | Compress · Merge (name order) · Split (every page, every N pages or ranges) · Rotate · Extract pages · Protect (AES-256 password) · Metadata |
 | Subtitles | Shift timing |
 | Archives | Extract (zip-slip safe) |
 
@@ -85,7 +85,7 @@ Share (Windows share sheet, Nearby Sharing) · Shelf (a floating shelf that hold
 
 ## Engines
 
-Poppy handles images, PDFs, spreadsheets, subtitles and archives on its own. These programs add more when they are installed; **Settings → Engines** shows what was found and copies the `winget install` command for anything missing.
+Poppy handles images, PDFs, spreadsheets, subtitles and archives on its own. These programs add more. You never have to install them by hand: drop a file on a greyed-out petal and Poppy offers to install what it needs (through winget), then continues with your file. **Settings → Engines** also has an Install button for each.
 
 | Engine | Adds |
 |---|---|

@@ -128,6 +128,19 @@ public partial class App : Application
     {
         try
         {
+            if (!item.Enabled && item.Need != null)
+            {
+                var what = (files.Length == 1 ? Path.GetFileName(files[0].TrimEnd('\\')) : L.F("job.files", files.Length)) + " → " + item.Label;
+                if (!await EnsureEngineAsync(item.Need, what)) return;
+                var mode = item.IsConvert ? RingMode.Convert : item.IsAction ? RingMode.Actions : RingMode.Tools;
+                var fresh = Catalog.Items(mode, files).FirstOrDefault(i => i.Id == item.Id);
+                if (fresh is not { Enabled: true })
+                {
+                    jobs.Add(item.Label, null).Fail(fresh?.Reason ?? L.T("job.failed"));
+                    return;
+                }
+                item = fresh;
+            }
             if (item.IsAction && item.Id != "action.zip")
             {
                 Actions.Run(item.Id, files, jobs, GetShelf);
@@ -176,6 +189,44 @@ public partial class App : Application
     }
 
     ShelfWindow GetShelf() => shelf ??= new ShelfWindow();
+
+    // ---------- Engines ----------
+
+    /// <summary>Makes sure an engine is there, asking first. True when the work can go on.</summary>
+    internal async Task<bool> EnsureEngineAsync(string id, string forWhat)
+    {
+        var engine = Poppy.Core.Engines.EngineInstaller.Get(id);
+        if (engine == null) return false;
+        if (engine.IsInstalled()) return true;
+        if (new InstallPrompt(engine, forWhat).ShowDialog() != true) return false;
+        return await InstallEngineAsync(engine);
+    }
+
+    internal async Task<bool> InstallEngineAsync(Poppy.Core.Engines.EngineInfo engine)
+    {
+        var card = jobs.Add(engine.Name, null);
+        card.SetStatus(L.T("inst.prepare"));
+        using var cts = new CancellationTokenSource();
+        card.CancelRequested += cts.Cancel;
+        try
+        {
+            var r = await Poppy.Core.Engines.EngineInstaller.InstallAsync(engine, s => Dispatcher.BeginInvoke(() => card.SetStatus(s)), cts.Token);
+            if (r.Ok) card.Finish(r.Message, []);
+            else card.Fail(r.Message);
+            return r.Ok;
+        }
+        catch (OperationCanceledException)
+        {
+            card.Fail(L.T("job.cancelled"));
+            return false;
+        }
+        catch (Exception e)
+        {
+            Log(e);
+            card.Fail(e.Message);
+            return false;
+        }
+    }
 
     // ---------- Windows & tray ----------
 

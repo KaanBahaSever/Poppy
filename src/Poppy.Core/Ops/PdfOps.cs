@@ -106,7 +106,11 @@ public static class PdfOps
         return folder;
     }
 
-    static readonly Lazy<bool> ocrAvailable = new(() =>
+    static Lazy<bool> ocrAvailable = NewOcrProbe();
+
+    public static void ResetOcr() => ocrAvailable = NewOcrProbe();
+
+    static Lazy<bool> NewOcrProbe() => new(() =>
     {
         try { return Windows.Media.Ocr.OcrEngine.TryCreateFromUserProfileLanguages() != null; }
         catch { return false; }
@@ -158,12 +162,14 @@ public static class PdfOps
 
     // ---------- Tools ----------
 
+    /// <summary>All PDFs into one, in natural name order (part2 before part10).</summary>
     public static string Merge(IReadOnlyList<string> inputs)
     {
         if (inputs.Count < 2) throw new OpException(L.T("need.multiple"));
-        var output = OutputPaths.For(inputs[0], "pdf", "merged");
+        var ordered = inputs.OrderBy(Path.GetFileName, NaturalComparer.Instance).ToList();
+        var output = OutputPaths.For(ordered[0], "pdf", "merged");
         using var target = new PdfDocument();
-        foreach (var path in inputs)
+        foreach (var path in ordered)
         {
             using var src = Open(path, PdfDocumentOpenMode.Import);
             foreach (var page in src.Pages) target.AddPage(page);
@@ -172,18 +178,55 @@ public static class PdfOps
         return output;
     }
 
-    public static string Split(string input)
+    /// <summary>
+    /// "mode": "each" (one file per page, the default), "every" with "n" (a file every n pages),
+    /// or "ranges" ("1-3, 4-6, 7-": one file per comma-separated part).
+    /// </summary>
+    public static string Split(string input, OpOptions? o = null)
     {
         using var src = Open(input, PdfDocumentOpenMode.Import);
-        var folder = OutputPaths.NewFolder(input, "pages");
-        var digits = src.PageCount.ToString().Length;
-        for (int i = 0; i < src.PageCount; i++)
+        var count = src.PageCount;
+        var parts = SplitPlan(o?.Get("mode", "each") ?? "each", o?.GetInt("n", 2) ?? 2, o?.Get("ranges") ?? "", count);
+        if (parts.Count == 0) throw new OpException("No pages in range");
+        var folder = OutputPaths.NewFolder(input, parts.Count == count ? "pages" : "parts");
+        // Files are named after their pages ("report-3", "report-4-6") so the order sorts right.
+        var digits = count.ToString().Length;
+        string N(int page) => page.ToString().PadLeft(digits, '0');
+        for (int i = 0; i < parts.Count; i++)
         {
-            using var one = new PdfDocument();
-            one.AddPage(src.Pages[i]);
-            one.Save(Path.Combine(folder, $"{OutputPaths.BaseName(input)}-{(i + 1).ToString().PadLeft(digits, '0')}.pdf"));
+            using var doc = new PdfDocument();
+            foreach (var page in parts[i]) doc.AddPage(src.Pages[page - 1]);
+            var name = parts[i].Count == 1
+                ? $"{OutputPaths.BaseName(input)}-{N(parts[i][0])}.pdf"
+                : $"{OutputPaths.BaseName(input)}-{N(parts[i][0])}-{N(parts[i][^1])}.pdf";
+            doc.Save(Path.Combine(folder, name));
         }
         return folder;
+    }
+
+    /// <summary>Which 1-based pages go into each output file.</summary>
+    public static List<List<int>> SplitPlan(string mode, int n, string ranges, int pageCount)
+    {
+        var parts = new List<List<int>>();
+        switch (mode)
+        {
+            case "every":
+                n = Math.Max(1, n);
+                for (int start = 1; start <= pageCount; start += n)
+                    parts.Add(Enumerable.Range(start, Math.Min(n, pageCount - start + 1)).ToList());
+                break;
+            case "ranges":
+                foreach (var piece in ranges.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var pages = ParseRange(piece, pageCount);
+                    if (pages.Count > 0) parts.Add(pages);
+                }
+                break;
+            default:
+                for (int p = 1; p <= pageCount; p++) parts.Add([p]);
+                break;
+        }
+        return parts;
     }
 
     /// <summary>Every page 90° clockwise.</summary>

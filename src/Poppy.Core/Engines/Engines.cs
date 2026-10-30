@@ -8,16 +8,36 @@ namespace Poppy.Core.Engines;
 /// </summary>
 public static class Engines
 {
-    static readonly Lazy<string?> ffmpeg = new(() => Find("ffmpeg.exe", @"engines\ffmpeg", @"C:\ffmpeg\bin", @"%ProgramFiles%\ffmpeg\bin"));
-    static readonly Lazy<string?> ffprobe = new(() => Find("ffprobe.exe", @"engines\ffmpeg", @"C:\ffmpeg\bin", @"%ProgramFiles%\ffmpeg\bin"));
-    static readonly Lazy<string?> pandoc = new(() => Find("pandoc.exe", @"engines\pandoc", @"%LocalAppData%\Pandoc", @"%ProgramFiles%\Pandoc"));
-    static readonly Lazy<string?> soffice = new(() => Find("soffice.exe", @"%ProgramFiles%\LibreOffice\program", @"%ProgramFiles(x86)%\LibreOffice\program"));
-    static readonly Lazy<string?> sevenZip = new(() => Find("7z.exe", @"engines\7zip", @"%ProgramFiles%\7-Zip", @"%ProgramFiles(x86)%\7-Zip"));
-    static readonly Lazy<string?> ghostscript = new(FindGhostscript);
-    static readonly Lazy<string?> edge = new(() => Find("msedge.exe", @"%ProgramFiles(x86)%\Microsoft\Edge\Application", @"%ProgramFiles%\Microsoft\Edge\Application"));
-    static readonly Lazy<bool> word = new(() => HasProgId("Word.Application"));
-    static readonly Lazy<bool> powerPoint = new(() => HasProgId("PowerPoint.Application"));
-    static readonly Lazy<bool> excel = new(() => HasProgId("Excel.Application"));
+    // Where winget puts the command-line shims of portable packages (FFmpeg, ...).
+    const string WingetLinks = @"%LocalAppData%\Microsoft\WinGet\Links";
+
+    static Lazy<string?> ffmpeg = null!, ffprobe = null!, pandoc = null!, soffice = null!, sevenZip = null!, ghostscript = null!, edge = null!;
+    static Lazy<bool> word = null!, powerPoint = null!, excel = null!;
+
+    static Engines() => Init();
+
+    static void Init()
+    {
+        ffmpeg = new(() => Find("ffmpeg.exe", @"engines\ffmpeg", WingetLinks, @"C:\ffmpeg\bin", @"%ProgramFiles%\ffmpeg\bin"));
+        ffprobe = new(() => Find("ffprobe.exe", @"engines\ffmpeg", WingetLinks, @"C:\ffmpeg\bin", @"%ProgramFiles%\ffmpeg\bin"));
+        pandoc = new(() => Find("pandoc.exe", @"engines\pandoc", @"%LocalAppData%\Pandoc", @"%ProgramFiles%\Pandoc", WingetLinks));
+        soffice = new(() => Find("soffice.exe", @"%ProgramFiles%\LibreOffice\program", @"%ProgramFiles(x86)%\LibreOffice\program"));
+        sevenZip = new(() => Find("7z.exe", @"engines\7zip", @"%ProgramFiles%\7-Zip", @"%ProgramFiles(x86)%\7-Zip", WingetLinks));
+        ghostscript = new(FindGhostscript);
+        edge = new(() => Find("msedge.exe", @"%ProgramFiles(x86)%\Microsoft\Edge\Application", @"%ProgramFiles%\Microsoft\Edge\Application"));
+        word = new(() => HasProgId("Word.Application"));
+        powerPoint = new(() => HasProgId("PowerPoint.Application"));
+        excel = new(() => HasProgId("Excel.Application"));
+    }
+
+    /// <summary>Looks for engines again (after Poppy installed one), without restarting.</summary>
+    public static void Refresh()
+    {
+        Init();
+        lock (EncodersLock) encoders = null;
+        Ops.WicImaging.Reset();
+        Ops.PdfOps.ResetOcr();
+    }
 
     /// <summary>Overrides for tests and for the "disable engine" switches.</summary>
     public static Func<string, bool>? Disabled { get; set; }

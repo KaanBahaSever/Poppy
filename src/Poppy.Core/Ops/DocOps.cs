@@ -84,6 +84,13 @@ public static class DocOps
         return null;
     }
 
+    /// <summary>Pandoc for Markdown/EPUB work, otherwise LibreOffice (free, covers every Office format).</summary>
+    public static string MissingEngine(string path, string target)
+    {
+        var src = Norm(FileKinds.Ext(path));
+        return E.Pandoc == null && (src is "md" or "epub" || target is "md" or "epub") ? "pandoc" : "libreoffice";
+    }
+
     public static string? Unavailable(string path, string target)
     {
         var src = FileKinds.Ext(path);

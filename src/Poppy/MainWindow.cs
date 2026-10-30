@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using Microsoft.Win32;
 using Poppy.Core;
+using Poppy.Core.Engines;
 using E = Poppy.Core.Engines.Engines;
 using static Poppy.Theme;
 
@@ -258,38 +259,69 @@ sealed class MainWindow : Window
         var s = new StackPanel();
         s.Children.Add(H1(L.T("nav.engines")));
         s.Children.Add(P(L.T("eng.lead")));
+
+        var office = E.Word || E.PowerPoint || E.Excel;
+        // LibreOffice is only "missing" for people without Microsoft Office.
+        var missing = EngineInstaller.All.Where(e => e.CanAutoInstall && !e.IsInstalled() && !(e.Id == "libreoffice" && office)).ToList();
+        if (missing.Count > 0)
+        {
+            var all = new Button { Content = L.T("eng.installall") + $" ({missing.Count})", Style = Styles.Primary, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
+            all.Click += async (_, _) =>
+            {
+                all.IsEnabled = false;
+                foreach (var e in missing) await App.Current2.InstallEngineAsync(e);
+                Navigate("engines");
+            };
+            s.Children.Add(all);
+        }
+
         var list = new StackPanel();
-        void Engine(string name, string use, bool ok, string? detail, string? winget)
+        void Row(string name, string use, bool ok, string? detail, UIElement? action)
         {
             var g = new Grid { Margin = new Thickness(0, 8, 0, 8) };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
             g.ColumnDefinitions.Add(new ColumnDefinition());
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            g.Children.Add(new TextBlock { Text = ok ? "" : "", FontFamily = Icons, FontSize = 16, Foreground = Brush(ok ? Color.FromRgb(0x22, 0xA0, 0x55) : Color.FromRgb(0xC0, 0x40, 0x30)), VerticalAlignment = VerticalAlignment.Center });
+            g.Children.Add(new TextBlock { Text = ok ? "\uE73E" : "\uE711", FontFamily = Icons, FontSize = 16, Foreground = Brush(ok ? Color.FromRgb(0x22, 0xA0, 0x55) : Color.FromRgb(0xC0, 0x40, 0x30)), VerticalAlignment = VerticalAlignment.Center });
             var text = new StackPanel();
             text.Children.Add(new TextBlock { Text = name, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush(Theme.Text) });
             text.Children.Add(new TextBlock { Text = use + (detail != null ? " · " + detail : ""), FontSize = 12, Foreground = Brush(SubText), TextTrimming = TextTrimming.CharacterEllipsis });
             Grid.SetColumn(text, 1);
             g.Children.Add(text);
-            if (!ok && winget != null)
+            if (action != null)
             {
-                var b = new Button { Content = L.T("eng.copy"), ToolTip = "winget install " + winget };
-                b.Click += (_, _) => { System.Windows.Clipboard.SetText("winget install --id " + winget + " -e"); b.Content = L.T("copied"); };
-                Grid.SetColumn(b, 2);
-                g.Children.Add(b);
+                Grid.SetColumn(action, 2);
+                g.Children.Add(action);
             }
             list.Children.Add(g);
         }
-        Engine("FFmpeg", L.T("eng.ffmpeg"), E.HasFfmpeg, E.Ffmpeg, "Gyan.FFmpeg");
-        Engine("Magick.NET / PDFsharp", L.T("eng.builtin"), true, L.T("eng.included"), null);
-        Engine("Microsoft Office", L.T("eng.office"), E.Word || E.PowerPoint || E.Excel, string.Join(", ", new[] { E.Word ? "Word" : null, E.PowerPoint ? "PowerPoint" : null, E.Excel ? "Excel" : null }.Where(x => x != null)), null);
-        Engine("LibreOffice", L.T("eng.libre"), E.LibreOffice != null, E.LibreOffice, "TheDocumentFoundation.LibreOffice");
-        Engine("Pandoc", L.T("eng.pandoc"), E.Pandoc != null, E.Pandoc, "JohnMacFarlane.Pandoc");
-        Engine("7-Zip", L.T("eng.7zip"), E.SevenZip != null, E.SevenZip, "7zip.7zip");
-        Engine("Ghostscript", L.T("eng.gs"), E.Ghostscript != null, E.Ghostscript, "ArtifexSoftware.GhostScript");
-        Engine("Microsoft Edge", L.T("eng.edge"), E.Edge != null, null, null);
+
+        Row("Magick.NET · PDFsharp", L.T("eng.builtin"), true, L.T("eng.included"), null);
+        Row("Microsoft Office", L.T("eng.office"), office,
+            string.Join(", ", new[] { E.Word ? "Word" : null, E.PowerPoint ? "PowerPoint" : null, E.Excel ? "Excel" : null }.Where(x => x != null)), null);
+        foreach (var e in EngineInstaller.All)
+        {
+            var ok = e.IsInstalled();
+            Button? b = null;
+            if (!ok)
+            {
+                var label = e.CanAutoInstall ? L.T("eng.install") : e.StoreId != null ? L.T("eng.store") : L.T("eng.page");
+                var button = new Button { Content = label, ToolTip = e.Size };
+                if (e.CanAutoInstall) button.Style = Styles.Primary;
+                var engine = e;
+                button.Click += async (_, _) =>
+                {
+                    button.IsEnabled = false;
+                    button.Content = L.T("eng.installing");
+                    await App.Current2.InstallEngineAsync(engine);
+                    Navigate("engines");
+                };
+                b = button;
+            }
+            Row(e.Name, e.Purpose, ok, ok ? L.T("eng.ready") : e.Size, b);
+        }
+        Row("Microsoft Edge", L.T("eng.edge"), E.Edge != null, null, null);
         s.Children.Add(Card(list));
-        s.Children.Add(P(L.T("eng.restart"), 12));
         return s;
     }
 

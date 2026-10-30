@@ -74,8 +74,10 @@ sealed class JobCard
     public readonly Border Root;
     readonly TextBlock status;
     readonly ProgressBar bar;
-    readonly Button action;
+    readonly Button show;
+    readonly Button open;
     readonly Button close;
+    bool running = true;
     readonly JobsWindow owner;
     IReadOnlyList<string> outputs = [];
     DispatcherTimer? autoClose;
@@ -111,18 +113,26 @@ sealed class JobCard
         text.Children.Add(bar);
         grid.Children.Add(text);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+        // Round icon buttons, the same quiet style as the close button: show in folder, open, close.
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, -4, 0) };
         Grid.SetColumn(buttons, 2);
-        action = SmallButton(L.T("job.cancel"), false);
-        action.Click += (_, _) =>
+        show = IconButton("\uE838", L.T("job.show"));
+        show.Click += (_, _) => { if (outputs.Count > 0) Reveal(outputs[0]); };
+        open = IconButton("\uE8A7", L.T("job.open"));
+        open.Click += (_, _) =>
         {
-            if (outputs.Count > 0) Reveal(outputs[0]);
-            else CancelRequested?.Invoke();
+            if (outputs.Count == 1) Open(outputs[0]);
+            else if (outputs.Count > 1) Reveal(outputs[0]);
         };
-        close = SmallButton("", true);
-        close.Visibility = Visibility.Collapsed;
-        close.Click += (_, _) => owner.Remove(this);
-        buttons.Children.Add(action);
+        close = IconButton("\uE711", L.T("cancel"));
+        close.Click += (_, _) =>
+        {
+            if (running) CancelRequested?.Invoke();
+            else owner.Remove(this);
+        };
+        show.Visibility = open.Visibility = Visibility.Collapsed;
+        buttons.Children.Add(show);
+        buttons.Children.Add(open);
         buttons.Children.Add(close);
         grid.Children.Add(buttons);
 
@@ -139,16 +149,22 @@ sealed class JobCard
         };
     }
 
-    static Button SmallButton(string text, bool icon) => new()
+    // The glyph is an explicit TextBlock: the app-wide TextBlock style would otherwise replace the
+    // icon font with Segoe UI and draw an empty box.
+    static Button IconButton(string glyph, string tip)
     {
-        Content = text,
-        FontFamily = icon ? Icons : Ui,
-        FontSize = icon ? 10 : 12,
-        Padding = new Thickness(icon ? 6 : 10, 3, icon ? 6 : 10, 4),
-        Margin = new Thickness(4, 0, 0, 0),
-        Cursor = System.Windows.Input.Cursors.Hand,
-        Style = Styles.Ghost,
-    };
+        var b = new Button
+        {
+            Content = new TextBlock { Text = glyph, FontFamily = Icons, FontSize = 13 },
+            ToolTip = tip,
+            Style = Styles.Icon,
+            Margin = new Thickness(2, 0, 0, 0),
+        };
+        System.Windows.Automation.AutomationProperties.SetName(b, tip);
+        return b;
+    }
+
+    public void SetStatus(string text) => status.Text = text;
 
     public void SetProgress(double v)
     {
@@ -165,9 +181,10 @@ sealed class JobCard
         bar.Visibility = Visibility.Collapsed;
         status.Text = message;
         status.Foreground = Brush(SubText);
-        action.Content = L.T("job.show");
-        action.Visibility = results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        close.Visibility = Visibility.Visible;
+        running = false;
+        show.Visibility = open.Visibility = results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        close.ToolTip = L.T("job.close");
+        System.Windows.Automation.AutomationProperties.SetName(close, L.T("job.close"));
         CloseAfter(TimeSpan.FromSeconds(5));
     }
 
@@ -176,8 +193,9 @@ sealed class JobCard
         bar.Visibility = Visibility.Collapsed;
         status.Text = L.T("job.failed") + ": " + message;
         status.Foreground = Brush(Color.FromRgb(0xD9, 0x30, 0x25));
-        action.Visibility = Visibility.Collapsed;
-        close.Visibility = Visibility.Visible;
+        running = false;
+        show.Visibility = open.Visibility = Visibility.Collapsed;
+        close.ToolTip = L.T("job.close");
         CloseAfter(TimeSpan.FromSeconds(15));
     }
 
@@ -192,6 +210,13 @@ sealed class JobCard
             else CloseAfter(TimeSpan.FromSeconds(2));
         };
         autoClose.Start();
+    }
+
+    /// <summary>Opens a result in its default app (a folder opens in File Explorer).</summary>
+    public static void Open(string path)
+    {
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch { Reveal(path); }
     }
 
     public static void Reveal(string path)

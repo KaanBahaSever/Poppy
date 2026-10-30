@@ -39,6 +39,25 @@ public class ToolTests
     }
 
     [Fact]
+    public async Task CompressesManyImagesInOneDrop()
+    {
+        var a = Samples.Copy("sample.jpg", out var dir);
+        var b = Path.Combine(dir, "two.png");
+        var c = Path.Combine(dir, "three.bmp");
+        File.Copy(Samples.Get("sample.png"), b);
+        File.Copy(Samples.Get("sample.bmp"), c);
+        var r = await Runner.RunAsync("image.compress", new OpContext { Inputs = [a, b, c] });
+        // Each file is compressed on its own; one that cannot shrink is skipped, never broken.
+        Assert.InRange(r.Outputs.Count, 2, 3);
+        foreach (var o in r.Outputs)
+        {
+            Assert.Contains("-compressed", o);
+            var original = new[] { a, b, c }.Single(x => Path.GetFileNameWithoutExtension(o).StartsWith(Path.GetFileNameWithoutExtension(x)));
+            Assert.True(new FileInfo(o).Length < new FileInfo(original).Length, o);
+        }
+    }
+
+    [Fact]
     public async Task ImageMetadataIsStripped()
     {
         using (var before = Img(Samples.Get("sample.jpg"))) Assert.NotNull(before.GetExifProfile());

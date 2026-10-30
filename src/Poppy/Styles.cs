@@ -11,6 +11,7 @@ static class Styles
     public static Style Primary => Get("PrimaryButton");
     public static Style Ghost => Get("GhostButton");
     public static Style Toggle => Get("ToolToggle");
+    public static Style Icon => Get("IconButton");
 }
 
 /// <summary>The Poppy flower, loaded from the embedded PNG.</summary>

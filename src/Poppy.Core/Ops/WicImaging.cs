@@ -12,7 +12,11 @@ namespace Poppy.Core.Ops;
 /// </summary>
 public static class WicImaging
 {
-    static readonly Lazy<bool> canEncodeHeic = new(() =>
+    static Lazy<bool> canEncodeHeic = NewProbe();
+
+    public static void Reset() => canEncodeHeic = NewProbe();
+
+    static Lazy<bool> NewProbe() => new(() =>
     {
         try
         {

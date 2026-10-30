@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Poppy;
@@ -34,11 +35,7 @@ static class ShellThumbnail
             if (factory.GetImage(new SIZE { cx = size, cy = size }, SIIGBF_BIGGERSIZEOK, out var hbm) != 0) return null;
             try
             {
-                var bmp = Imaging.CreateBitmapSourceFromHBitmap(hbm, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                // GDI hands back top-down bitmaps with premultiplied alpha; WPF reads them correctly as Pbgra32.
-                var converted = new FormatConvertedBitmap(bmp, System.Windows.Media.PixelFormats.Pbgra32, null, 0);
-                converted.Freeze();
-                return converted;
+                return FromHBitmap(hbm);
             }
             finally
             {
@@ -53,5 +50,41 @@ static class ShellThumbnail
         {
             if (factory != null) Marshal.ReleaseComObject(factory);
         }
+    }
+
+    /// <summary>
+    /// GDI gets the orientation right (thumbnails and icons arrive in different row orders), but
+    /// photo thumbnails come with an all-zero alpha channel and would be drawn invisible. Keep the
+    /// pixels, and make them opaque when the bitmap has no real alpha.
+    /// </summary>
+    static BitmapSource FromHBitmap(IntPtr hbm)
+    {
+        BitmapSource src = Imaging.CreateBitmapSourceFromHBitmap(hbm, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        if (src.Format != PixelFormats.Bgra32 && src.Format != PixelFormats.Pbgra32)
+            src = new FormatConvertedBitmap(src, PixelFormats.Bgra32, null, 0);
+        int w = src.PixelWidth, h = src.PixelHeight, stride = w * 4;
+        var pixels = new byte[stride * h];
+        src.CopyPixels(pixels, stride, 0);
+
+        bool anyAlpha = false;
+        for (int i = 3; i < pixels.Length; i += 4)
+            if (pixels[i] != 0) { anyAlpha = true; break; }
+        if (!anyAlpha)
+            for (int i = 3; i < pixels.Length; i += 4) pixels[i] = 255;
+
+        // The shell's alpha is premultiplied.
+        var bmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Pbgra32, null, pixels, stride);
+        bmp.Freeze();
+        return bmp;
+    }
+
+    /// <summary>Diagnostics: <c>Poppy.exe --diag-thumb file out.png</c> writes what the ring and job cards show.</summary>
+    public static void Save(string path, string png)
+    {
+        var bmp = Get(path, 96) ?? throw new InvalidOperationException("no thumbnail");
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(bmp));
+        using var fs = System.IO.File.Create(png);
+        enc.Save(fs);
     }
 }

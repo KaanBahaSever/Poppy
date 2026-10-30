@@ -20,6 +20,20 @@ public static class Converter
         };
     }
 
+    /// <summary>Which installable engine (EngineInstaller id) would make this conversion possible.</summary>
+    public static string? MissingEngine(string path, string target)
+    {
+        if (Unavailable(path, target) == null) return null;
+        return FileKinds.Detect(path) switch
+        {
+            FileCategory.Image => target == "heic" ? "heic" : "ffmpeg",
+            FileCategory.Video or FileCategory.Audio or FileCategory.Subtitle => "ffmpeg",
+            FileCategory.Pdf => "ocr",
+            FileCategory.Document or FileCategory.Slides or FileCategory.Spreadsheet or FileCategory.Ebook => DocOps.MissingEngine(path, target),
+            _ => "7zip",
+        };
+    }
+
     public static async Task<IReadOnlyList<string>> ConvertAsync(OpContext ctx, string target)
     {
         var archives = FileKinds.Detect(ctx.Inputs[0]) is FileCategory.Folder or FileCategory.Other
@@ -106,7 +120,7 @@ public static class Runner
                 "audio.fade" => await MediaOps.FadeAsync(input, P, ct),
 
                 "pdf.compress" => await PdfOps.CompressAsync(input, ct),
-                "pdf.split" => await Task.Run(() => PdfOps.Split(input), ct),
+                "pdf.split" => await Task.Run(() => PdfOps.Split(input, o), ct),
                 "pdf.rotate" => await Task.Run(() => PdfOps.Rotate(input), ct),
                 "pdf.extract" => await Task.Run(() => PdfOps.Extract(input, o), ct),
                 "pdf.protect" => await Task.Run(() => PdfOps.Protect(input, o), ct),

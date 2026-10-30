@@ -81,7 +81,19 @@ static class Program
             e.Graphics.FillEllipse(b1, 40, 60, 260, 260);
             e.Graphics.FillEllipse(b2, 300, 330, 300, 300);
         };
-        source.Shown += (_, _) => { backdrop.Show(); source.BringToFront(); };
+        // Same for the corner where job cards appear.
+        var area = Screen.PrimaryScreen!.WorkingArea;
+        var cornerBackdrop = new Form
+        {
+            FormBorderStyle = FormBorderStyle.None,
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(area.Right - 460, area.Bottom - 300),
+            Size = new Size(460, 300),
+            TopMost = true,
+            ShowInTaskbar = false,
+            BackColor = Color.FromArgb(232, 228, 240),
+        };
+        source.Shown += (_, _) => { backdrop.Show(); cornerBackdrop.Show(); source.BringToFront(); };
         int exit = 1;
         source.Shown += (_, _) => new Thread(() =>
         {
@@ -118,6 +130,8 @@ static class Program
             var png = MakeImage("photo.png");
             Scenario("convert ring: PNG -> JPG", () => DragTo(png, [VK_SHIFT], RingMode.Convert, "convert:jpg", "convert-ring.png"),
                 () => WaitFile(Path.Combine(work, "photo.jpg")));
+
+            Scenario("job card: Show button opens Explorer (real click)", ClickShowOnJobCard, () => true);
 
             var png2 = MakeImage("tools.png");
             Scenario("tools ring: strip metadata", () => DragTo(png2, [VK_CONTROL], RingMode.Tools, "image.metadata", "tools-ring.png"),
@@ -170,6 +184,23 @@ static class Program
                 return Directory.GetFiles(work, "center*").Length == 1;
             });
 
+            if (!Poppy.Core.Ops.ImageOps.CanWrite("heic"))
+            {
+                var png8 = MakeImage("needs-engine.png");
+                Scenario("drop on a segment that needs an engine offers to install it", () =>
+                {
+                    DragTo(png8, [VK_SHIFT], RingMode.Convert, "convert:heic", null);
+                    IntPtr dlg = IntPtr.Zero;
+                    if (!WaitFor(() => (dlg = WindowWithTitle("Install HEVC")) != IntPtr.Zero, 5000)) throw new Exception("no install prompt");
+                    source.Invoke(() => { foreach (Form f in Application.OpenForms) if (f != source) f.Hide(); });
+                    Thread.Sleep(600);
+                    Capture2(dlg, "install-prompt.png");
+                    source.Invoke(() => { foreach (Form f in Application.OpenForms) if (f != source) f.Show(); });
+                    Tap(VK_ESCAPE);
+                    if (!WaitFor(() => WindowWithTitle("Install HEVC") == IntPtr.Zero, 3000)) throw new Exception("prompt did not close on Esc");
+                }, () => !File.Exists(Path.Combine(work, "needs-engine.heic")));
+            }
+
             Scenario("tapping a key without a drag does nothing", () =>
             {
                 MoveSmooth(600, 500);
@@ -186,6 +217,79 @@ static class Program
         Log(failures.Count == 0 ? "E2E: ALL PASSED" : $"E2E: {failures.Count} FAILED: {string.Join("; ", failures)}");
         return failures.Count == 0 ? 0 : 1;
     }
+
+    /// <summary>
+    /// Finds the "Show" button on the finished job card with UI Automation, then clicks it with the
+    /// real mouse (a UIA Invoke would bypass hit-testing, which is what broke on the layered window).
+    /// </summary>
+    static void ClickShowOnJobCard()
+    {
+        var jobs = FindWindow(null, "Poppy Jobs");
+        if (jobs == IntPtr.Zero || !WaitFor(() => IsWindowVisible(jobs), 5000)) throw new Exception("no job card");
+        System.Windows.Automation.AutomationElement? show = null;
+        WaitFor(() =>
+        {
+            var win = System.Windows.Automation.AutomationElement.FromHandle(jobs);
+            show = win.FindFirst(System.Windows.Automation.TreeScope.Descendants,
+                new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, "Show in folder"));
+            return show != null && !show.Current.IsOffscreen;
+        }, 8000);
+        if (show == null) throw new Exception("Show button not found");
+        Capture2(jobs, "job-card.png");
+        var before = ExplorerWindows();
+        var r = show.Current.BoundingRectangle;
+        MoveSmooth((int)(r.Left + r.Width / 2), (int)(r.Top + r.Height / 2));
+        Thread.Sleep(200);
+        MouseDown();
+        Thread.Sleep(60);
+        MouseUp();
+        IntPtr opened = IntPtr.Zero;
+        if (!WaitFor(() => (opened = ExplorerWindows().Except(before).FirstOrDefault()) != IntPtr.Zero, 8000))
+            throw new Exception("clicking Show did not open File Explorer");
+        Thread.Sleep(800);
+        PostMessage(opened, 0x0010 /* WM_CLOSE */, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    static IntPtr WindowWithTitle(string prefix)
+    {
+        var found = IntPtr.Zero;
+        EnumWindows((h, _) =>
+        {
+            var t = new System.Text.StringBuilder(256);
+            GetWindowText(h, t, 256);
+            if (IsWindowVisible(h) && t.ToString().StartsWith(prefix)) { found = h; return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+
+    static List<IntPtr> ExplorerWindows()
+    {
+        var list = new List<IntPtr>();
+        EnumWindows((h, _) =>
+        {
+            var c = new System.Text.StringBuilder(64);
+            GetClassName(h, c, 64);
+            if (c.ToString() == "CabinetWClass" && IsWindowVisible(h)) list.Add(h);
+            return true;
+        }, IntPtr.Zero);
+        return list;
+    }
+
+    static void Capture2(IntPtr h, string name)
+    {
+        GetWindowRect(h, out var r);
+        using var bmp = new Bitmap(r.Right - r.Left, r.Bottom - r.Top);
+        using (var g = Graphics.FromImage(bmp)) g.CopyFromScreen(r.Left, r.Top, 0, 0, bmp.Size);
+        bmp.Save(Path.Combine(shots, name), ImageFormat.Png);
+    }
+
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
 
     static void Scenario(string name, Action act, Func<bool> check)
     {

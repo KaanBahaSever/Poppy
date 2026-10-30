@@ -16,7 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>Poppy.Program</StartupObject>
     <ApplicationIcon>Assets\Poppy.ico</ApplicationIcon>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Product>Poppy</Product>
     <Company>Poppy</Company>
     <Description>Drag a file, tap a key, pick from the ring.</Description>

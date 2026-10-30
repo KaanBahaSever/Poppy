@@ -33,7 +33,7 @@ abstract class PoppyDialog : Window
         FontFamily = Ui;
 
         var layout = new DockPanel { Margin = new Thickness(20, 16, 20, 16) };
-        var heading = new TextBlock { Text = title, FontFamily = UiDisplay, FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) };
+        var heading = new TextBlock { Text = title, FontFamily = UiDisplay, FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap };
         heading.SetResourceReference(TextBlock.ForegroundProperty, "Text");
         DockPanel.SetDock(heading, Dock.Top);
         layout.Children.Add(heading);
@@ -119,7 +119,9 @@ sealed class OptionsDialog : PoppyDialog
 
     public OptionsDialog Number(string key, string label, double value, string? suffix = null)
     {
-        fields.Children.Add(Label(label, 12));
+        var group = new StackPanel { Tag = key };
+        fields.Children.Add(group);
+        group.Children.Add(Label(label, 12));
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         var box = new TextBox { Text = value.ToString(System.Globalization.CultureInfo.InvariantCulture), Width = 120, Name = "f_" + key.Replace('.', '_') };
         box.PreviewTextInput += (_, e) => e.Handled = !e.Text.All(ch => char.IsDigit(ch) || ch is '-' or '.' or ',');
@@ -130,20 +132,22 @@ sealed class OptionsDialog : PoppyDialog
             s.SetResourceReference(TextBlock.ForegroundProperty, "SubText");
             row.Children.Add(s);
         }
-        fields.Children.Add(row);
+        group.Children.Add(row);
         readers[key] = () => box.Text.Replace(',', '.');
-        Loaded += (_, _) => { box.Focus(); box.SelectAll(); };
+        Loaded += (_, _) => { if (group.Visibility == Visibility.Visible) { box.Focus(); box.SelectAll(); } };
         return this;
     }
 
     public OptionsDialog Text(string key, string label, string value, string? hint = null)
     {
-        fields.Children.Add(Label(label, 12));
+        var group = new StackPanel { Tag = key };
+        fields.Children.Add(group);
+        group.Children.Add(Label(label, 12));
         var box = new TextBox { Text = value };
-        fields.Children.Add(box);
-        if (hint != null) fields.Children.Add(Label(hint, 6));
+        group.Children.Add(box);
+        if (hint != null) group.Children.Add(Label(hint, 6));
         readers[key] = () => box.Text;
-        Loaded += (_, _) => { box.Focus(); box.SelectAll(); };
+        Loaded += (_, _) => { if (group.Visibility == Visibility.Visible) { box.Focus(); box.SelectAll(); } };
         return this;
     }
 
@@ -221,14 +225,8 @@ sealed class OptionsDialog : PoppyDialog
 
     public void SetVisible(string key, bool visible)
     {
-        // Number fields are a label + row pair; hide both.
-        foreach (var box in fields.Children.OfType<StackPanel>().SelectMany(p => p.Children.OfType<TextBox>()).Where(b => b.Name == "f_" + key.Replace('.', '_')))
-        {
-            var row = (FrameworkElement)box.Parent;
-            row.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            var i = fields.Children.IndexOf(row);
-            if (i > 0) fields.Children[i - 1].Visibility = row.Visibility;
-        }
+        foreach (var g in fields.Children.OfType<StackPanel>().Where(g => Equals(g.Tag, key)))
+            g.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     protected override bool Validate()
@@ -260,6 +258,7 @@ static class Ask
                 .Number("padding", L.T("dlg.padding"), 0, "%"),
             InputKind.Speed => new OptionsDialog(L.T("tool.speed"), 250)
                 .Choice("factor", L.T("dlg.speed"), [("0.5", "0.5×"), ("0.75", "0.75×"), ("1.25", "1.25×"), ("1.5", "1.5×"), ("2", "2×"), ("3", "3×")], "2"),
+            InputKind.SplitPdf => SplitPdf(files[0]),
             InputKind.PageRange => new OptionsDialog(L.T("tool.extract"), 280)
                 .Text("pages", L.T("dlg.pages"), "1", L.F("dlg.pages.hint", SafePageCount(files[0]))),
             InputKind.Password => new OptionsDialog(L.T("tool.protect"), 320).Password("password"),
@@ -301,9 +300,46 @@ static class Ask
         return d;
     }
 
+    static OptionsDialog SplitPdf(string pdf)
+    {
+        var d = new OptionsDialog(L.T("tool.split"), 360)
+            .Choice("mode", L.T("split.how"), [("each", L.T("split.each")), ("every", L.T("split.every")), ("ranges", L.T("split.ranges"))], "each")
+            .Number("n", L.T("split.n"), 2, L.T("split.pages"))
+            .Text("ranges", L.T("split.rangeslabel"), "1-3, 4-", L.F("split.hint", SafePageCount(pdf)));
+        d.Loaded += (_, _) => { d.SetVisible("n", false); d.SetVisible("ranges", false); };
+        d.ChoiceChanged += (_, v) => { d.SetVisible("n", v == "every"); d.SetVisible("ranges", v == "ranges"); };
+        return d;
+    }
+
     static int SafePageCount(string pdf)
     {
         try { return PdfOps.PageCount(pdf); }
         catch { return 0; }
     }
+}
+
+/// <summary>"Poppy needs X for this. Install it?" with what it is, how big, and that it is free.</summary>
+sealed class InstallPrompt : PoppyDialog
+{
+    public InstallPrompt(Poppy.Core.Engines.EngineInfo engine, string forWhat) : base(L.F("inst.title", engine.Name), 540, 310)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(new Image { Source = Logo.Small, Width = 48, Height = 48, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Top });
+        var text = new TextBlock
+        {
+            Text = engine.CanAutoInstall
+                ? L.F("inst.body", engine.Name, forWhat, engine.Size)
+                : L.F("inst.body.store", engine.Name, forWhat),
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 14,
+            MaxWidth = 410,
+            LineHeight = 21,
+        };
+        text.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+        row.Children.Add(text);
+        Body.Children.Add(row);
+        OkButton.Content = engine.CanAutoInstall ? L.T("inst.yes") : L.T("inst.open");
+    }
+
+    public override OpOptions Options => new();
 }

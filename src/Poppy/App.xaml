@@ -10,6 +10,7 @@
         <SolidColorBrush x:Key="WindowBg" Color="#F5F5F6"/>
         <SolidColorBrush x:Key="Card" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="CardEdge" Color="#E6E6E8"/>
+        <SolidColorBrush x:Key="HoverBg" Color="#14000000"/>
         <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
@@ -55,9 +56,35 @@
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
+        <!-- Not fully transparent: on layered windows (job cards, shelf) a 0-alpha pixel lets clicks fall through. -->
         <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="#01FFFFFF"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <!-- Small round icon button (job cards): no frame, a soft circle and coral icon on hover. -->
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubText}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" CornerRadius="15" Background="#01FFFFFF">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource HoverBg}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="b" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="ToolToggle" TargetType="ToggleButton">
             <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>

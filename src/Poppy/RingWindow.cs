@@ -116,7 +116,7 @@ sealed class RingWindow : Window
         Canvas.SetTop(thumb, C - 31);
         ringCanvas.Children.Add(thumb);
 
-        pillText = new TextBlock { FontFamily = Ui, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 150 };
+        pillText = new TextBlock { FontFamily = Ui, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 210 };
         pill = new Border { Child = pillText, CornerRadius = new CornerRadius(9), Padding = new Thickness(9, 2, 9, 3), Background = Brush(Plum) };
         ringCanvas.Children.Add(pill);
 
@@ -267,7 +267,7 @@ sealed class RingWindow : Window
         var p = e.GetPosition(ringCanvas);
         var hit = layout.HitTest(p.X - C, p.Y - C);
         SetHover(hit);
-        e.Effects = hit >= 0 && hit < items.Count && items[hit].Enabled && files != null
+        e.Effects = hit >= 0 && hit < items.Count && Droppable(items[hit]) && files != null
             ? DragDropEffects.Copy
             : DragDropEffects.None;
     }
@@ -278,7 +278,7 @@ sealed class RingWindow : Window
         var p = e.GetPosition(ringCanvas);
         var hit = layout.HitTest(p.X - C, p.Y - C);
         var dropped = files ?? e.Data.GetData(DataFormats.FileDrop) as string[];
-        if (hit >= 0 && hit < items.Count && items[hit].Enabled && dropped is { Length: > 0 })
+        if (hit >= 0 && hit < items.Count && Droppable(items[hit]) && dropped is { Length: > 0 })
         {
             e.Effects = DragDropEffects.Copy;
             var item = items[hit];
@@ -292,6 +292,9 @@ sealed class RingWindow : Window
             Close();
         }
     }
+
+    // A segment that only lacks an engine still takes the drop: Poppy offers to install it.
+    static bool Droppable(RingItem i) => i.Enabled || i.Need != null;
 
     // ---------- Building the ring ----------
 
@@ -369,7 +372,7 @@ sealed class RingWindow : Window
         Color color;
         if (item != null)
         {
-            text = item.Enabled ? item.Label : item.Reason ?? item.Label;
+            text = item.Enabled ? item.Label : (item.Reason ?? item.Label) + (item.Need != null ? " · " + L.T("need.drop") : "");
             color = item.Enabled ? PetalDeep : Color.FromRgb(0x6B, 0x6B, 0x70);
         }
         else if (files == null)
@@ -439,6 +442,7 @@ sealed class RingWindow : Window
         readonly TextBlock? label;
         readonly RingItem? item;
         readonly ScaleTransform pop = new(1, 1);
+        StackPanel? labels;
         readonly Brush normalFill;
 
         const double Round = 12;   // stroke width that rounds the corners
@@ -485,6 +489,7 @@ sealed class RingWindow : Window
             Canvas.SetTop(stack, C + y - stack.DesiredSize.Height / 2);
             Root.Children.Add(stack);
             SetColors(false);
+            labels = stack;
             if (!item.Enabled) stack.Opacity = 0.4;
         }
 
@@ -527,7 +532,18 @@ sealed class RingWindow : Window
         {
             if (item == null) return;
             var on = hot && item.Enabled;
+            // Missing engine: a quiet plum highlight that says "drop here to install".
+            var install = hot && !item.Enabled && item.Need != null;
             SetColors(on);
+            if (install)
+            {
+                shape.Fill = shape.Stroke = Brush(Plum);
+                edge.Stroke = edge.Fill = Brush(Plum);
+                if (glyph != null) glyph.Foreground = Brushes.White;
+                if (label != null) label.Foreground = Brushes.White;
+            }
+            if (labels != null && !item.Enabled) labels.Opacity = install ? 1 : 0.4;
+            on |= install;
             var to = on ? 1.035 : 1.0;
             var anim = new DoubleAnimation(to, TimeSpan.FromMilliseconds(110)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
             pop.BeginAnimation(ScaleTransform.ScaleXProperty, anim);

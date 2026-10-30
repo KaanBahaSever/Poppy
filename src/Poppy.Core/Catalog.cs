@@ -19,6 +19,7 @@ public enum InputKind
     Trim,
     Speed,
     PageRange,
+    SplitPdf,
     Password,
     Offset,
     Folder,
@@ -28,6 +29,9 @@ public sealed record RingItem(string Id, string Label, string Glyph = "", InputK
 {
     public bool Enabled { get; init; } = true;
     public string? Reason { get; init; }
+
+    /// <summary>When disabled for want of an engine: the EngineInstaller id that would enable it.</summary>
+    public string? Need { get; init; }
 
     public bool IsConvert => Id.StartsWith("convert:");
     public bool IsAction => Id.StartsWith("action.");
@@ -91,8 +95,14 @@ public static class Catalog
         }
         return targets.Take(MaxSegments).Select(t =>
         {
-            var reason = paths.Select(p => Converter.Unavailable(p, t)).FirstOrDefault(r => r != null);
-            return new RingItem("convert:" + t, Label(t)) { Enabled = reason == null, Reason = reason };
+            var blocked = paths.FirstOrDefault(p => Converter.Unavailable(p, t) != null);
+            var reason = blocked == null ? null : Converter.Unavailable(blocked, t);
+            return new RingItem("convert:" + t, Label(t))
+            {
+                Enabled = reason == null,
+                Reason = reason,
+                Need = blocked == null ? null : Converter.MissingEngine(blocked, t),
+            };
         }).ToList();
     }
 
@@ -150,7 +160,7 @@ public static class Catalog
                     Enabled = paths.Count >= 2,
                     Reason = paths.Count >= 2 ? null : L.T("need.multiple"),
                 },
-                Tool("pdf.split", "tool.split", "\uE8A9"),
+                Tool("pdf.split", "tool.split", "\uE8A9", InputKind.SplitPdf, single),
                 Tool("pdf.rotate", "tool.rotate", "\uE7AD"),
                 Tool("pdf.extract", "tool.extract", "\uE8E5", InputKind.PageRange, single),
                 Tool("pdf.protect", "tool.protect", "\uE72E", InputKind.Password),
@@ -168,7 +178,7 @@ public static class Catalog
         };
 
         if (cat is FileCategory.Video or FileCategory.Audio && !Engines.Engines.HasFfmpeg)
-            items = items.Select(i => i with { Enabled = false, Reason = L.T("need.ffmpeg") }).ToList();
+            items = items.Select(i => i with { Enabled = false, Reason = L.T("need.ffmpeg"), Need = "ffmpeg" }).ToList();
         if (cat == FileCategory.Archive && paths.Any(p => !ArchiveOps.CanRead(p)))
             items = items.Select(i => i with { Enabled = false, Reason = L.T("need.7zip") }).ToList();
         return items;
