@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install FFmpeg (LGPL) and Pandoc
+        shell: pwsh
+        run: |
+          $zip = "$env:RUNNER_TEMP\ffmpeg.zip"
+          Invoke-WebRequest https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip -OutFile $zip
+          Expand-Archive $zip "$env:RUNNER_TEMP\ffmpeg"
+          $bin = (Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
+          Add-Content $env:GITHUB_PATH $bin
+          choco install pandoc -y --no-progress
+          Add-Content $env:GITHUB_PATH "C:\Program Files\Pandoc"
+
+      - name: Build
+        run: dotnet build Poppy.sln -c Release
+
+      - name: Test
+        run: dotnet test tests/Poppy.Core.Tests -c Release --no-build --logger "console;verbosity=normal"
