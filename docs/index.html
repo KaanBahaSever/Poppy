@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poppy · Drag. Tap. Done.</title>
+<meta name="description" content="Poppy is a ring of file tools that opens under your cursor while you drag a file in Windows. Convert, compress, trim and share files without opening an app.">
+<meta property="og:title" content="Poppy · Drag. Tap. Done.">
+<meta property="og:description" content="Drag a file, tap a key, pick from the ring. A free, open-source file converter for Windows.">
+<meta property="og:image" content="https://kaanbahasever.github.io/Poppy/banner.png">
+<link rel="icon" href="logo.png">
+<style>
+  :root {
+    --petal-light: #ff8658;
+    --petal: #ff5a36;
+    --petal-deep: #d62c18;
+    --plum: #2b1630;
+    --plum-soft: #46224e;
+    --gold: #ffc94d;
+    --bg: #fffaf7;
+    --bg-2: #fff1ea;
+    --card: #ffffff;
+    --edge: #f0e4de;
+    --ink: #1d1420;
+    --sub: #6e6070;
+    --petal-face-1: #ffffff;
+    --petal-face-2: #eeeff1;
+    --petal-edge: rgba(0, 0, 0, .16);
+    --disc: rgba(244, 245, 247, .78);
+    --desk-1: #ffe3d3;
+    --desk-2: #dce6f8;
+    --shadow: 0 18px 50px rgba(60, 20, 40, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151016;
+      --bg-2: #1d151f;
+      --card: #221a24;
+      --edge: #35293a;
+      --ink: #f6eef5;
+      --sub: #b3a5b5;
+      --petal-face-1: #3a3a3e;
+      --petal-face-2: #2c2c30;
+      --petal-edge: rgba(255, 255, 255, .22);
+      --disc: rgba(34, 34, 38, .82);
+      --desk-1: #3a2230;
+      --desk-2: #1f2a40;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151016; --bg-2: #1d151f; --card: #221a24; --edge: #35293a; --ink: #f6eef5; --sub: #b3a5b5;
+    --petal-face-1: #3a3a3e; --petal-face-2: #2c2c30; --petal-edge: rgba(255,255,255,.22); --disc: rgba(34,34,38,.82);
+    --desk-1: #3a2230; --desk-2: #1f2a40; --shadow: 0 18px 50px rgba(0,0,0,.45);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---------- Nav ---------- */
+  nav { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(1.4) blur(14px); background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--edge) 60%, transparent); }
+  nav .wrap { display: flex; align-items: center; gap: 18px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; text-decoration: none; letter-spacing: -.01em; }
+  .brand img { width: 30px; height: 30px; }
+  nav .links { display: flex; gap: 22px; margin-left: auto; align-items: center; }
+  nav .links a { text-decoration: none; color: var(--sub); font-size: 15px; }
+  nav .links a:hover { color: var(--ink); }
+  .lang { display: flex; background: var(--bg-2); border: 1px solid var(--edge); border-radius: 99px; padding: 2px; }
+  .lang button { border: 0; background: transparent; color: var(--sub); font: 600 12px/1 inherit; padding: 6px 10px; border-radius: 99px; cursor: pointer; }
+  .lang button[aria-pressed="true"] { background: var(--plum); color: #fff; }
+  @media (max-width: 720px) { nav .links a.hide-sm { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero { position: relative; padding: 64px 0 28px; text-align: center; }
+  .hero::before {
+    content: ""; position: absolute; inset: -120px -20% auto; height: 620px; z-index: -1;
+    background: radial-gradient(40% 50% at 30% 30%, color-mix(in srgb, var(--petal-light) 30%, transparent), transparent 70%),
+                radial-gradient(35% 45% at 75% 40%, color-mix(in srgb, #7aa2ff 22%, transparent), transparent 70%);
+  }
+  .hero img.logo { width: 96px; height: 96px; filter: drop-shadow(0 10px 24px rgba(214, 44, 24, .28)); animation: bloom 900ms cubic-bezier(.2, .9, .3, 1.2) both; }
+  @keyframes bloom { from { transform: scale(.6) rotate(-40deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  h1 { font: 700 clamp(42px, 7vw, 76px)/1.02 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; letter-spacing: -.035em; margin: 18px 0 14px; }
+  h1 .petal { background: linear-gradient(120deg, var(--petal-light), var(--petal-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--sub); max-width: 640px; margin: 0 auto 28px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600; font-size: 16px;
+    padding: 13px 22px; border-radius: 14px; border: 1px solid var(--edge); background: var(--card); color: var(--ink); cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn.primary { background: linear-gradient(180deg, var(--petal-light), var(--petal-deep)); border-color: transparent; color: #fff; box-shadow: 0 10px 26px rgba(214, 44, 24, .28); }
+  .btn svg { width: 20px; height: 20px; }
+  .winget { font: 500 14px/1 ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--plum); color: #f3e7f2; border: 0; }
+  .winget .copied { color: var(--gold); }
+  .small { color: var(--sub); font-size: 14px; margin-top: 14px; }
+
+  /* ---------- Demo ---------- */
+  section { padding: 56px 0; }
+  .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: var(--petal-deep); text-align: center; margin: 0 0 8px; }
+  h2 { font: 700 clamp(30px, 4.4vw, 44px)/1.1 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; letter-spacing: -.025em; text-align: center; margin: 0 0 14px; }
+  .sublead { text-align: center; color: var(--sub); max-width: 640px; margin: 0 auto 30px; }
+
+  .desk {
+    position: relative; height: 470px; border-radius: 22px; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none;
+    background: radial-gradient(60% 70% at 15% 15%, var(--desk-1), transparent 70%), radial-gradient(60% 70% at 90% 90%, var(--desk-2), transparent 70%), var(--bg-2);
+    border: 1px solid var(--edge); box-shadow: var(--shadow);
+  }
+  .desk .hint {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); white-space: nowrap;
+    background: color-mix(in srgb, var(--card) 88%, transparent); border: 1px solid var(--edge); border-radius: 99px;
+    padding: 8px 16px; font-size: 14px; color: var(--sub); backdrop-filter: blur(8px); max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis;
+  }
+  kbd { font: 600 12px/1 inherit; background: var(--card); border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 6px; padding: 3px 7px; color: var(--ink); }
+  .files { position: absolute; inset: 26px 26px auto 26px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-content: flex-start; }
+  .file { width: 96px; text-align: center; cursor: grab; border-radius: 12px; padding: 8px 4px; transition: background .15s, opacity .2s, transform .25s; }
+  .file:hover { background: color-mix(in srgb, var(--card) 60%, transparent); }
+  .file.dragging { opacity: .35; }
+  .file.new { animation: pop 520ms cubic-bezier(.2, .9, .3, 1.4) both; }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  .file .thumb { width: 64px; height: 64px; margin: 0 auto 6px; border-radius: 12px; display: grid; place-items: center; color: #fff; font: 700 13px/1 inherit; box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+  .file .name { font-size: 12.5px; word-break: break-all; line-height: 1.25; }
+  .ghost { position: absolute; z-index: 5; pointer-events: none; width: 64px; height: 64px; border-radius: 12px; transform: translate(-50%, -50%) rotate(-6deg); box-shadow: 0 16px 30px rgba(0,0,0,.22); display: grid; place-items: center; color: #fff; font: 700 13px/1 inherit; }
+
+  .ring { position: absolute; z-index: 6; width: 320px; height: 366px; transform: translate(-50%, -160px) scale(.86); opacity: 0; transition: opacity .13s ease-out, transform .13s ease-out; pointer-events: none; }
+  .ring.open { opacity: 1; transform: translate(-50%, -160px) scale(1); }
+  .ring svg { overflow: visible; }
+  .ring .modes { position: absolute; left: 50%; top: 322px; transform: translateX(-50%); display: flex; gap: 0; background: var(--plum); border-radius: 17px; padding: 4px; box-shadow: 0 8px 20px rgba(0,0,0,.25); pointer-events: auto; }
+  .ring .modes span { color: #e8d9e6; font-size: 12.5px; font-weight: 600; padding: 4px 11px 5px; border-radius: 13px; white-space: nowrap; }
+  .ring .modes span small { color: #9c869e; font-weight: 400; margin-left: 5px; font-size: 10.5px; }
+  .ring .modes span.on { background: linear-gradient(180deg, var(--petal-light), var(--petal-deep)); color: #fff; }
+  .ring .modes span.on small { color: rgba(255,255,255,.82); }
+
+  .toast {
+    position: absolute; top: 18px; right: 18px; z-index: 8; display: flex; gap: 12px; align-items: center; max-width: 330px;
+    background: var(--card); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow);
+    transform: translateY(-14px); opacity: 0; transition: .25s ease; pointer-events: none;
+  }
+  .toast.show { transform: none; opacity: 1; }
+  .toast img { width: 30px; height: 30px; }
+  .toast b { display: block; font-size: 14px; }
+  .toast span { font-size: 13px; color: var(--sub); }
+
+  /* ---------- Rings ---------- */
+  .rings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .ring-card { background: var(--card); border: 1px solid var(--edge); border-radius: 20px; padding: 22px 18px 20px; text-align: center; }
+  .ring-card img { width: 100%; max-width: 300px; aspect-ratio: 380 / 426; object-fit: cover; border-radius: 14px; }
+  .ring-card h3 { margin: 12px 0 4px; font-size: 20px; }
+  .ring-card p { margin: 0; color: var(--sub); font-size: 15px; }
+  .ring-card kbd { font-size: 13px; padding: 4px 9px; }
+  @media (max-width: 860px) { .rings { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; } }
+
+  /* ---------- Features ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+  .feature { background: var(--card); border: 1px solid var(--edge); border-radius: 18px; padding: 20px; }
+  .feature h3 { margin: 0 0 4px; font-size: 17px; display: flex; gap: 10px; align-items: center; }
+  .feature h3 i { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, var(--petal) 14%, transparent); color: var(--petal-deep); font-style: normal; }
+  .feature h3 i svg { width: 17px; height: 17px; }
+  .feature p { margin: 0 0 12px; color: var(--sub); font-size: 14.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 7px; background: var(--bg-2); border: 1px solid var(--edge); }
+
+  .promise { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .promise div { text-align: center; padding: 10px; }
+  .promise b { display: block; font-size: 18px; margin: 8px 0 4px; }
+  .promise span { color: var(--sub); font-size: 15px; }
+  .promise svg { width: 30px; height: 30px; color: var(--petal-deep); }
+  @media (max-width: 720px) { .promise { grid-template-columns: 1fr; } }
+
+  /* ---------- Install ---------- */
+  .install { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .install .opt { background: var(--card); border: 1px solid var(--edge); border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .install .opt h3 { margin: 0; font-size: 18px; }
+  .install .opt p { margin: 0; color: var(--sub); font-size: 14.5px; flex: 1; }
+  .install code { font: 13px/1.4 ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--plum); color: #f3e7f2; padding: 10px 12px; border-radius: 10px; overflow-x: auto; white-space: nowrap; }
+  .install .soon { font-size: 12px; font-weight: 700; color: var(--petal-deep); text-transform: uppercase; letter-spacing: .1em; }
+  @media (max-width: 860px) { .install { grid-template-columns: 1fr; } }
+
+  footer { padding: 40px 0 56px; color: var(--sub); font-size: 14px; text-align: center; }
+  footer a { color: var(--sub); }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="logo.png" alt="">Poppy</a>
+    <div class="links">
+      <a href="#demo" class="hide-sm" data-i18n="nav.demo">Try it</a>
+      <a href="#features" class="hide-sm" data-i18n="nav.features">Features</a>
+      <a href="#install" class="hide-sm" data-i18n="nav.install">Install</a>
+      <a href="https://github.com/KaanBahaSever/Poppy">GitHub</a>
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="en" aria-pressed="true">EN</button>
+        <button data-lang="tr" aria-pressed="false">TR</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="logo" src="logo.png" alt="Poppy logo">
+    <h1 data-i18n-html="hero.title">Drag. Tap. <span class="petal">Done.</span></h1>
+    <p class="lead" data-i18n="hero.lead">Start dragging any file, tap a key, and a ring of tools blooms under your cursor. Convert, compress, trim and share without opening an app.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/KaanBahaSever/Poppy/releases/latest/download/Poppy-win-Setup.exe">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3Zm0 13 7.5 1.1v-7H3Zm8.4 1.3L21 21v-8.5h-9.6Zm0-15.6v7.3H21V3Z"/></svg>
+        <span data-i18n="hero.download">Download for Windows</span>
+      </a>
+      <button class="btn winget" id="winget" title="Copy">winget install KaanBahaSever.Poppy</button>
+    </div>
+    <p class="small" data-i18n="hero.small">Free and open source · Windows 10 &amp; 11 · No account, no telemetry</p>
+  </div>
+</header>
+
+<section id="demo">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="demo.eyebrow">Try it right here</p>
+    <h2 data-i18n="demo.title">Drag a file. Tap a key.</h2>
+    <p class="sublead" data-i18n-html="demo.lead">This is a little Windows desktop. Grab a file, and while you hold it tap <kbd>Shift</kbd>, <kbd>Ctrl</kbd> or <kbd>Alt</kbd>. Drop it on a petal.</p>
+    <div class="desk" id="desk">
+      <div class="files" id="files"></div>
+      <div class="ring" id="ring" aria-hidden="true"></div>
+      <div class="toast" id="toast"><img src="logo.png" alt=""><div><b id="toast-title"></b><span id="toast-text"></span></div></div>
+      <div class="hint" id="hint"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="rings.eyebrow">Three rings</p>
+    <h2 data-i18n="rings.title">One gesture, everything you do with files</h2>
+    <p class="sublead" data-i18n="rings.lead">Tap another key while the ring is open to switch. Esc closes it. Results are saved next to the original, and Poppy never overwrites a file.</p>
+    <div class="rings">
+      <div class="ring-card"><img src="screenshots/convert-ring.png" alt="Convert ring" loading="lazy"><h3><kbd>Shift</kbd> <span data-i18n="mode.convert">Convert</span></h3><p data-i18n="rings.convert">PNG, WEBP, AVIF, HEIC, MP3, MP4, PDF, DOCX and more</p></div>
+      <div class="ring-card"><img src="screenshots/tools-ring.png" alt="Tools ring" loading="lazy"><h3><kbd>Ctrl</kbd> <span data-i18n="mode.tools">Tools</span></h3><p data-i18n="rings.tools">Compress, trim, crop, edit, redact, merge, protect</p></div>
+      <div class="ring-card"><img src="screenshots/actions-ring.png" alt="Actions ring" loading="lazy"><h3><kbd>Alt</kbd> <span data-i18n="mode.actions">Actions</span></h3><p data-i18n="rings.actions">Share, shelf, copy, move, copy path, terminal, zip</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="features.eyebrow">What it can do</p>
+    <h2 data-i18n="features.title">Every file you drag has a ring</h2>
+    <p class="sublead" data-i18n="features.lead">Poppy picks what makes sense for the file under your cursor.</p>
+    <div class="grid" id="feature-grid"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap promise">
+    <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg><b data-i18n="promise.private">Private</b><span data-i18n="promise.private.text">Everything happens on your PC. Nothing is uploaded.</span></div>
+    <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg><b data-i18n="promise.fast">Instant</b><span data-i18n="promise.fast.text">The ring is ready before you tap. Video re-wraps in seconds when it can.</span></div>
+    <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><b data-i18n="promise.open">Open source</b><span data-i18n="promise.open.text">GPL-3.0 on GitHub. Read it, build it, improve it.</span></div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="install.eyebrow">Get Poppy</p>
+    <h2 data-i18n="install.title">Install in seconds</h2>
+    <p class="sublead" data-i18n="install.lead">No admin rights needed. Poppy lives in the tray and starts with Windows.</p>
+    <div class="install">
+      <div class="opt"><h3>winget</h3><p data-i18n="install.winget">One line in Terminal. Updates with <i>winget upgrade</i>.</p><code>winget install KaanBahaSever.Poppy</code></div>
+      <div class="opt"><h3 data-i18n="install.setup.title">Installer</h3><p data-i18n="install.setup">A small setup that updates itself from GitHub Releases.</p><a class="btn primary" href="https://github.com/KaanBahaSever/Poppy/releases/latest/download/Poppy-win-Setup.exe" data-i18n="hero.download">Download for Windows</a></div>
+      <div class="opt"><span class="soon" data-i18n="install.soon">Coming soon</span><h3>Microsoft Store</h3><p data-i18n="install.store">The same app with Store updates. Buying it supports development.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <img src="logo.png" alt="" width="28" height="28"><br>
+    <span data-i18n="footer.made">Poppy · Free software under the GNU GPL v3</span> ·
+    <a href="https://github.com/KaanBahaSever/Poppy">GitHub</a> ·
+    <a href="https://github.com/KaanBahaSever/Poppy/issues" data-i18n="footer.issue">Report a problem</a>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // ---------- Text ----------
+  const T = {
+    en: {
+      "nav.demo": "Try it", "nav.features": "Features", "nav.install": "Install",
+      "hero.title": 'Drag. Tap. <span class="petal">Done.</span>',
+      "hero.lead": "Start dragging any file, tap a key, and a ring of tools blooms under your cursor. Convert, compress, trim and share without opening an app.",
+      "hero.download": "Download for Windows",
+      "hero.small": "Free and open source · Windows 10 & 11 · No account, no telemetry",
+      "demo.eyebrow": "Try it right here", "demo.title": "Drag a file. Tap a key.",
+      "demo.lead": "This is a little Windows desktop. Grab a file, and while you hold it tap <kbd>Shift</kbd>, <kbd>Ctrl</kbd> or <kbd>Alt</kbd>. Drop it on a petal.",
+      "hint.idle": "Drag a file, then tap Shift, Ctrl or Alt",
+      "hint.idle.touch": "Drag a file: the ring opens by itself",
+      "hint.dragging": "Now tap Shift (Convert), Ctrl (Tools) or Alt (Actions)",
+      "hint.open": "Drop on a petal · another key switches · Esc closes",
+      "hint.open.touch": "Drop on a petal · slide over the bar to switch rings",
+      "rings.eyebrow": "Three rings", "rings.title": "One gesture, everything you do with files",
+      "rings.lead": "Tap another key while the ring is open to switch. Esc closes it. Results are saved next to the original, and Poppy never overwrites a file.",
+      "mode.convert": "Convert", "mode.tools": "Tools", "mode.actions": "Actions",
+      "rings.convert": "PNG, WEBP, AVIF, HEIC, MP3, MP4, PDF, DOCX and more",
+      "rings.tools": "Compress, trim, crop, edit, redact, merge, protect",
+      "rings.actions": "Share, shelf, copy, move, copy path, terminal, zip",
+      "features.eyebrow": "What it can do", "features.title": "Every file you drag has a ring", "features.lead": "Poppy picks what makes sense for the file under your cursor.",
+      "promise.private": "Private", "promise.private.text": "Everything happens on your PC. Nothing is uploaded.",
+      "promise.fast": "Instant", "promise.fast.text": "The ring is ready before you tap. Video re-wraps in seconds when it can.",
+      "promise.open": "Open source", "promise.open.text": "GPL-3.0 on GitHub. Read it, build it, improve it.",
+      "install.eyebrow": "Get Poppy", "install.title": "Install in seconds", "install.lead": "No admin rights needed. Poppy lives in the tray and starts with Windows.",
+      "install.winget": "One line in Terminal. Updates with winget upgrade.", "install.setup.title": "Installer",
+      "install.setup": "A small setup that updates itself from GitHub Releases.", "install.soon": "Coming soon",
+      "install.store": "The same app with Store updates. Buying it supports development.",
+      "footer.made": "Poppy · Free software under the GNU GPL v3", "footer.issue": "Report a problem",
+      "copied": "Copied!", "nothing": "Nothing here", "done": "Done",
+      "saved": "Saved next to the original", "pathcopied": "Path copied to the clipboard", "copiedfile": "Ready to paste in Explorer",
+      "share": "The Windows share sheet opens", "shelf": "The file floats on the shelf", "move": "Pick a folder and it moves there",
+      "terminal": "Terminal opens in this folder", "editor": "An editor opens, then it is saved",
+      "f.images": "Images", "f.images.t": "Photos, screenshots, icons, even iPhone HEIC.",
+      "f.video": "Video", "f.video.t": "Re-wrap, convert, compress, trim on a waveform.",
+      "f.audio": "Audio", "f.audio.t": "Every common format, plus loudness normalize.",
+      "f.pdf": "PDF", "f.pdf.t": "Pages to images, text with built-in OCR, merge and protect.",
+      "f.docs": "Documents & slides", "f.docs.t": "Word, PowerPoint, Markdown, EPUB, using Office or Pandoc.",
+      "f.more": "Sheets, subtitles, archives", "f.more.t": "CSV to Excel to JSON, SRT to VTT, ZIP to 7Z."
+    },
+    tr: {
+      "nav.demo": "Dene", "nav.features": "Özellikler", "nav.install": "Kur",
+      "hero.title": 'Sürükle. Dokun. <span class="petal">Bitti.</span>',
+      "hero.lead": "Herhangi bir dosyayı sürüklemeye başla, bir tuşa dokun; imlecin altında bir araç halkası açar. Uygulama açmadan dönüştür, sıkıştır, kes, paylaş.",
+      "hero.download": "Windows için indir",
+      "hero.small": "Ücretsiz ve açık kaynak · Windows 10 ve 11 · Hesap yok, izleme yok",
+      "demo.eyebrow": "Hemen burada dene", "demo.title": "Dosyayı sürükle. Tuşa dokun.",
+      "demo.lead": "Bu küçük bir Windows masaüstü. Bir dosyayı tut, tutarken <kbd>Shift</kbd>, <kbd>Ctrl</kbd> ya da <kbd>Alt</kbd> tuşuna dokun. Bir yaprağın üstüne bırak.",
+      "hint.idle": "Bir dosyayı sürükle, sonra Shift, Ctrl ya da Alt'a dokun",
+      "hint.idle.touch": "Bir dosyayı sürükle: halka kendiliğinden açılır",
+      "hint.dragging": "Şimdi Shift (Dönüştür), Ctrl (Araçlar) ya da Alt'a (Eylemler) dokun",
+      "hint.open": "Bir yaprağa bırak · başka tuş halkayı değiştirir · Esc kapatır",
+      "hint.open.touch": "Bir yaprağa bırak · halkayı değiştirmek için çubuğun üstünden geç",
+      "rings.eyebrow": "Üç halka", "rings.title": "Tek hareket, dosyalarla yaptığın her şey",
+      "rings.lead": "Halka açıkken başka bir tuşa dokunarak geçiş yap, Esc ile kapat. Sonuç orijinalin yanına kaydedilir; Poppy hiçbir dosyanın üzerine yazmaz.",
+      "mode.convert": "Dönüştür", "mode.tools": "Araçlar", "mode.actions": "Eylemler",
+      "rings.convert": "PNG, WEBP, AVIF, HEIC, MP3, MP4, PDF, DOCX ve fazlası",
+      "rings.tools": "Sıkıştır, kes, kırp, düzenle, karart, birleştir, şifrele",
+      "rings.actions": "Paylaş, raf, kopyala, taşı, yolu kopyala, terminal, zip",
+      "features.eyebrow": "Neler yapar", "features.title": "Sürüklediğin her dosyanın bir halkası var", "features.lead": "Poppy, imlecin altındaki dosyaya uygun olanı seçer.",
+      "promise.private": "Gizli", "promise.private.text": "Her şey senin bilgisayarında olur. Hiçbir şey yüklenmez.",
+      "promise.fast": "Anında", "promise.fast.text": "Halka sen dokunmadan hazır. Video mümkünse saniyeler içinde yeniden paketlenir.",
+      "promise.open": "Açık kaynak", "promise.open.text": "GitHub'da GPL-3.0. Oku, derle, geliştir.",
+      "install.eyebrow": "Poppy'yi edin", "install.title": "Saniyeler içinde kur", "install.lead": "Yönetici izni gerekmez. Poppy sistem tepsisinde yaşar ve Windows ile başlar.",
+      "install.winget": "Terminal'de tek satır. winget upgrade ile güncellenir.", "install.setup.title": "Kurulum dosyası",
+      "install.setup": "Kendini GitHub'dan güncelleyen küçük bir kurulum.", "install.soon": "Yakında",
+      "install.store": "Store güncellemeleriyle aynı uygulama. Satın almak geliştirmeyi destekler.",
+      "footer.made": "Poppy · GNU GPL v3 ile özgür yazılım", "footer.issue": "Sorun bildir",
+      "copied": "Kopyalandı!", "nothing": "Burada bir şey yok", "done": "Bitti",
+      "saved": "Orijinalin yanına kaydedildi", "pathcopied": "Yol panoya kopyalandı", "copiedfile": "Gezgin'e yapıştırmaya hazır",
+      "share": "Windows paylaşım penceresi açılır", "shelf": "Dosya rafta yüzer", "move": "Bir klasör seçersin, oraya taşınır",
+      "terminal": "Bu klasörde Terminal açılır", "editor": "Bir düzenleyici açılır, sonra kaydedilir",
+      "f.images": "Görseller", "f.images.t": "Fotoğraflar, ekran görüntüleri, ikonlar, iPhone HEIC bile.",
+      "f.video": "Video", "f.video.t": "Yeniden paketle, dönüştür, sıkıştır, ses dalgası üzerinde kes.",
+      "f.audio": "Ses", "f.audio.t": "Tüm yaygın formatlar ve ses seviyesi eşitleme.",
+      "f.pdf": "PDF", "f.pdf.t": "Sayfaları görsele, yerleşik OCR ile metne; birleştir ve şifrele.",
+      "f.docs": "Belgeler ve sunumlar", "f.docs.t": "Word, PowerPoint, Markdown, EPUB; Office ya da Pandoc ile.",
+      "f.more": "Tablolar, altyazılar, arşivler", "f.more.t": "CSV'den Excel'e, JSON'a; SRT'den VTT'ye; ZIP'ten 7Z'ye."
+    }
+  };
+  const TOOLS = {
+    en: { compress: "Compress", resize: "Resize", crop: "Crop", edit: "Edit", annotate: "Annotate", redact: "Redact", background: "Background", metadata: "Metadata",
+          trim: "Trim", rotate: "Rotate", speed: "Speed", mute: "Mute", frame: "Frame", normalize: "Normalize", fade: "Fade", mono: "Mono",
+          merge: "Merge", split: "Split", extract: "Extract", protect: "Protect", unpack: "Extract",
+          share: "Share", copy: "Copy", copypath: "Copy Path", move: "Move", zip: "Zip", terminal: "Terminal", shelf: "Shelf" },
+    tr: { compress: "Sıkıştır", resize: "Boyutlandır", crop: "Kırp", edit: "Düzenle", annotate: "Çiz", redact: "Karart", background: "Arka Plan", metadata: "Meta Sil",
+          trim: "Kes", rotate: "Döndür", speed: "Hız", mute: "Sessiz", frame: "Kare Al", normalize: "Normalize", fade: "Geçiş", mono: "Mono",
+          merge: "Birleştir", split: "Böl", extract: "Sayfa Al", protect: "Şifrele", unpack: "Aç",
+          share: "Paylaş", copy: "Kopyala", copypath: "Yolu Kopyala", move: "Taşı", zip: "Zip", terminal: "Terminal", shelf: "Raf" }
+  };
+
+  let lang = (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
+  try {
+    const saved = localStorage.getItem("poppy-lang");
+    if (saved === "en" || saved === "tr") lang = saved;
+  } catch {}
+  const t = k => (T[lang] && T[lang][k]) || T.en[k] || k;
+  const tool = k => TOOLS[lang][k] || k;
+
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach(e => e.textContent = t(e.dataset.i18n));
+    document.querySelectorAll("[data-i18n-html]").forEach(e => e.innerHTML = t(e.dataset.i18nHtml));
+    document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+    buildFeatures();
+    setHint();
+    if (ring.open) drawRing();
+  }
+  document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem("poppy-lang", lang); } catch {}
+    applyLang();
+  }));
+
+  // ---------- Icons (24px stroke) ----------
+  const ICON = {
+    compress: "M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7",
+    resize: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7",
+    crop: "M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2",
+    edit: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
+    annotate: "M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z",
+    redact: "M9.9 4.2A10 10 0 0 1 12 4c7 0 10 8 10 8a13 13 0 0 1-1.7 2.7M6.6 6.6A13 13 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6M14.1 14.1a3 3 0 1 1-4.2-4.2M2 2l20 20",
+    background: "M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1 3.7A1.7 1.7 0 0 1 12 22ZM7.5 10.5h.01M10.5 7h.01M14.5 7h.01M17 10.5h.01",
+    metadata: "M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4ZM7.5 7.5h.01",
+    trim: "M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12",
+    rotate: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
+    speed: "M12 14l4-4M3.3 19a10 10 0 1 1 17.4 0",
+    mute: "M11 5 6 9H2v6h4l5 4V5ZM22 9l-6 6M16 9l6 6",
+    frame: "M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3ZM12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+    normalize: "M11 5 6 9H2v6h4l5 4V5ZM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14",
+    fade: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
+    mono: "M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3",
+    merge: "M12 5v14M5 12h14",
+    split: "M12 3v18M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z",
+    extract: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8ZM14 2v6h6M9 15h6M12 12l3 3-3 3",
+    unpack: "M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.7.9l.8 1.2a2 2 0 0 0 1.7.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z",
+    protect: "M5 11h14v10H5ZM8 11V7a4 4 0 0 1 8 0v4",
+    share: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13",
+    copy: "M8 8h12v12H8ZM4 16V6a2 2 0 0 1 2-2h10",
+    copypath: "M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7",
+    move: "M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.7.9l.8 1.2a2 2 0 0 0 1.7.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1M2 13h10M9 16l3-3-3-3",
+    zip: "M21 8 12 3 3 8v8l9 5 9-5ZM3 8l9 5 9-5M12 13v8",
+    terminal: "M4 17l6-6-6-6M12 19h8",
+    shelf: "M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V17h14v-1.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z",
+    image: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM21 15l-5-5L5 21M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+    film: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4",
+    music: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+    doc: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8ZM14 2v6h6M8 13h8M8 17h6",
+    grid: "M3 3h18v18H3ZM3 9h18M3 15h18M9 3v18"
+  };
+  const svgIcon = (name, size = 18) =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[name] || ""}"/></svg>`;
+
+  // ---------- What each file offers (mirrors Poppy's catalog) ----------
+  const KIND = ext =>
+    ["png", "jpg", "jpeg", "webp", "avif", "heic", "tiff", "bmp", "gif", "ico"].includes(ext) ? "image" :
+    ["mp4", "mkv", "webm", "mov", "avi"].includes(ext) ? "video" :
+    ["mp3", "wav", "flac", "m4a", "ogg", "opus", "aiff", "wma"].includes(ext) ? "audio" :
+    ext === "pdf" ? "pdf" : ["zip", "7z", "tar", "tar.gz"].includes(ext) ? "archive" : "other";
+  const TARGETS = {
+    image: ["png", "jpg", "webp", "avif", "heic", "tiff", "bmp", "pdf", "gif", "ico"],
+    video: ["mp4", "mkv", "webm", "mov", "avi", "gif", "mp3", "wav"],
+    audio: ["mp3", "wav", "flac", "m4a", "ogg", "opus", "aiff", "wma"],
+    pdf: ["png", "jpg", "webp", "tiff", "txt"],
+    archive: ["zip", "7z", "tar", "tar.gz"],
+    other: ["zip", "7z", "tar", "tar.gz"]
+  };
+  const TOOLSET = {
+    image: ["compress", "resize", "crop", "edit", "annotate", "redact", "background", "metadata"],
+    video: ["compress", "trim", "resize", "rotate", "speed", "mute", "frame", "metadata"],
+    audio: ["compress", "trim", "normalize", "fade", "speed", "mono", "metadata"],
+    pdf: ["compress", "merge", "split", "extract", "rotate", "protect", "metadata"],
+    archive: ["unpack"], other: []
+  };
+  const ACTIONS = ["share", "copy", "copypath", "move", "zip", "terminal", "shelf"];
+  const EDITORS = ["crop", "edit", "annotate", "redact", "trim", "resize", "background", "speed", "extract", "protect"];
+  const SUFFIX = { compress: "compressed", resize: "resized", crop: "cropped", edit: "edited", annotate: "annotated", redact: "redacted", background: "bg", metadata: "clean",
+                   trim: "trimmed", rotate: "rotated", speed: "2x", mute: "muted", frame: "frame", normalize: "normalized", fade: "faded", mono: "mono",
+                   merge: "merged", split: "pages", extract: "pages", protect: "protected" };
+
+  const splitName = n => { const m = n.match(/^(.*?)\.(tar\.gz|[^.]+)$/i); return m ? [m[1], m[2].toLowerCase()] : [n, ""]; };
+  function itemsFor(file, mode) {
+    const [, ext] = splitName(file);
+    const kind = KIND(ext);
+    const same = e => e === ext || (e === "jpg" && ext === "jpeg");
+    if (mode === "convert") return TARGETS[kind].filter(e => !same(e)).slice(0, 8).map(e => ({ id: "convert:" + e, label: e.toUpperCase(), target: e }));
+    if (mode === "tools") return TOOLSET[kind].map(k => ({ id: k, label: tool(k), icon: k, disabled: k === "merge" ? true : false }));
+    return ACTIONS.map(k => ({ id: k, label: tool(k), icon: k }));
+  }
+
+  const COLORS = { image: ["#ff9a6b", "#8b5cf6"], video: ["#3b82f6", "#1e3a8a"], audio: ["#22c55e", "#0f766e"], pdf: ["#ef4444", "#991b1b"], archive: ["#f59e0b", "#92400e"], other: ["#94a3b8", "#475569"] };
+  const KIND_ICON = { image: "image", video: "film", audio: "music", pdf: "doc", archive: "zip", other: "doc" };
+  const thumbStyle = name => { const k = KIND(splitName(name)[1]); const [a, b] = COLORS[k]; return `background: linear-gradient(135deg, ${a}, ${b})`; };
+  const thumbInner = name => { const k = KIND(splitName(name)[1]); return k === "image" ? "" : svgIcon(KIND_ICON[k], 28); };
+
+  // ---------- Desktop ----------
+  const desk = document.getElementById("desk");
+  const filesEl = document.getElementById("files");
+  const hint = document.getElementById("hint");
+  const touch = matchMedia("(pointer: coarse)").matches;
+  let files = ["photo.jpg", "clip.mp4", "report.pdf", "song.wav"];
+
+  function renderFiles(fresh) {
+    filesEl.innerHTML = "";
+    files.forEach(name => {
+      const el = document.createElement("div");
+      el.className = "file" + (name === fresh ? " new" : "");
+      el.dataset.name = name;
+      el.innerHTML = `<div class="thumb" style="${thumbStyle(name)}">${thumbInner(name)}</div><div class="name"></div>`;
+      el.querySelector(".name").textContent = name;
+      el.addEventListener("pointerdown", e => startDrag(e, name, el));
+      filesEl.appendChild(el);
+    });
+  }
+
+  function addFile(name) {
+    const [base, ext] = splitName(name);
+    let n = name, i = 1;
+    while (files.includes(n)) n = `${base} (${i++}).${ext}`;
+    files.push(n);
+    if (files.length > 12) files.splice(4, 1); // keep the originals, drop the oldest result
+    renderFiles(n);
+  }
+
+  function setHint() {
+    hint.textContent = ring.open ? t(touch ? "hint.open.touch" : "hint.open") : drag ? t(touch ? "hint.idle.touch" : "hint.dragging") : t(touch ? "hint.idle.touch" : "hint.idle");
+  }
+
+  // ---------- Ring ----------
+  const OUTER = 132, INNER = 54, C = 160, ROUND = 12, GAP = 3.5;
+  const ringEl = document.getElementById("ring");
+  const ring = { open: false, mode: "convert", x: 0, y: 0, hot: -1, items: [] };
+
+  const polar = (deg, r) => { const a = deg * Math.PI / 180; return [C + Math.sin(a) * r, C - Math.cos(a) * r]; };
+  function petalPath(i, n) {
+    if (n === 1) return null;
+    const sweep = 360 / n, start = i * sweep - sweep / 2, end = i * sweep + sweep / 2;
+    const ro = OUTER - ROUND / 2, ri = INNER + ROUND / 2, half = ROUND / 2 + GAP / 2;
+    const ao = half / ro * 180 / Math.PI, ai = half / ri * 180 / Math.PI;
+    const [x1, y1] = polar(start + ao, ro), [x2, y2] = polar(end - ao, ro), [x3, y3] = polar(end - ai, ri), [x4, y4] = polar(start + ai, ri);
+    return `M${x1} ${y1} A${ro} ${ro} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${ri} ${ri} 0 0 0 ${x4} ${y4} Z`;
+  }
+  function hitTest(dx, dy, n) {
+    const r = Math.hypot(dx, dy);
+    if (r < INNER) return -1;
+    if (r > OUTER + 24 || n === 0) return -2;
+    const sweep = 360 / n;
+    const angle = (Math.atan2(dx, -dy) * 180 / Math.PI + 360 + sweep / 2) % 360;
+    return Math.min(n - 1, Math.floor(angle / sweep));
+  }
+
+  function drawRing() {
+    const items = ring.items, n = items.length;
+    const petals = items.map((it, i) => {
+      const hot = i === ring.hot && !it.disabled;
+      const d = n === 1
+        ? `M${C} ${C - OUTER + ROUND / 2} A${OUTER - ROUND / 2} ${OUTER - ROUND / 2} 0 1 1 ${C - 0.01} ${C - OUTER + ROUND / 2} Z`
+        : petalPath(i, n);
+      const fill = hot ? "url(#hotfill)" : "url(#face)";
+      const a = i * (360 / n) * Math.PI / 180, rm = (OUTER + INNER) / 2;
+      const lx = C + Math.sin(a) * rm, ly = C - Math.cos(a) * rm;
+      const color = hot ? "#fff" : "var(--ink)";
+      const label = it.icon
+        ? `<g transform="translate(${lx - 9} ${ly - 19})" style="color:${hot ? "#fff" : "var(--petal)"}">${svgIcon(it.icon)}</g>
+           <text x="${lx}" y="${ly + 14}" text-anchor="middle" font-size="11.5" font-weight="600" fill="${color}">${it.label}</text>`
+        : `<text x="${lx}" y="${ly + 5}" text-anchor="middle" font-size="15" font-weight="700" fill="${color}">${it.label}</text>`;
+      return `<g opacity="${it.disabled ? 0.45 : 1}" ${hot ? 'filter="url(#glow)"' : ""}>
+        <path d="${d}" fill="${hot ? "#d62c18" : "var(--petal-edge)"}" stroke="${hot ? "#d62c18" : "var(--petal-edge)"}" stroke-width="${ROUND + 1.5}" stroke-linejoin="round" ${n === 1 ? 'fill-rule="evenodd"' : ""}/>
+        <path d="${d}" fill="${fill}" stroke="${fill}" stroke-width="${ROUND}" stroke-linejoin="round"/>
+        ${label}</g>`;
+    }).join("");
+    const hot = items[ring.hot];
+    const pill = hot ? (hot.disabled ? (lang === "tr" ? "İki PDF bırakın" : "Drop two PDFs") : hot.label) : n === 0 ? t("nothing") : drag ? drag.name : "Poppy";
+    const pillColor = hot && !hot.disabled ? "#d62c18" : "var(--plum)";
+    const pillW = Math.min(150, 18 + pill.length * 7.2);
+    ringEl.innerHTML = `
+      <svg width="320" height="320" viewBox="0 0 320 320" font-family="Segoe UI, system-ui, sans-serif">
+        <defs>
+          <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--petal-face-1)"/><stop offset="1" stop-color="var(--petal-face-2)"/></linearGradient>
+          <radialGradient id="hotfill" gradientUnits="userSpaceOnUse" cx="${C}" cy="${C}" r="${OUTER}"><stop offset=".38" stop-color="#d62c18"/><stop offset="1" stop-color="#ff8658"/></radialGradient>
+          <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#ff8658" flood-opacity=".6"/></filter>
+          <filter id="disc" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="12" flood-opacity=".22"/></filter>
+          <clipPath id="thumbclip"><rect x="${C - 25}" y="${C - 31}" width="50" height="50" rx="9"/></clipPath>
+        </defs>
+        <circle cx="${C}" cy="${C}" r="${OUTER + 12}" fill="var(--disc)" stroke="rgba(255,255,255,.7)" filter="url(#disc)"/>
+        ${n === 0 ? `<circle cx="${C}" cy="${C}" r="${(OUTER + INNER) / 2}" fill="none" stroke="var(--petal-edge)" stroke-width="${OUTER - INNER}" opacity=".35"/>` : petals}
+        <circle cx="${C}" cy="${C}" r="${INNER - 7}" fill="var(--petal-face-1)"/>
+        <foreignObject x="${C - 25}" y="${C - 31}" width="50" height="50" clip-path="url(#thumbclip)"><div xmlns="http://www.w3.org/1999/xhtml" style="width:50px;height:50px;display:grid;place-items:center;color:#fff;${drag ? thumbStyle(drag.name) : ""}">${drag ? thumbInner(drag.name).replace(/width="28" height="28"/, 'width="22" height="22"') : ""}</div></foreignObject>
+        <rect x="${C - pillW / 2}" y="${C + 20}" width="${pillW}" height="21" rx="9" fill="${pillColor}"/>
+        <text x="${C}" y="${C + 35}" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">${escapeXml(pill.length > 20 ? pill.slice(0, 19) + "…" : pill)}</text>
+      </svg>
+      <div class="modes">${["convert", "tools", "actions"].map((m, i) =>
+        `<span data-mode="${m}" class="${m === ring.mode ? "on" : ""}">${t("mode." + m)}<small>${["Shift", "Ctrl", "Alt"][i]}</small></span>`).join("")}</div>`;
+  }
+  const escapeXml = s => s.replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]);
+
+  function openRing(mode) {
+    const r = desk.getBoundingClientRect();
+    ring.mode = mode;
+    ring.items = itemsFor(drag.name, mode);
+    ring.hot = -2;
+    // Keep the whole ring inside the desk, like Poppy keeps it on screen.
+    ring.x = Math.min(Math.max(pointer.x, 160), r.width - 160);
+    ring.y = Math.min(Math.max(pointer.y, 160), r.height - 206);
+    ringEl.style.left = ring.x + "px";
+    ringEl.style.top = ring.y + "px";
+    ring.open = true;
+    drawRing();
+    requestAnimationFrame(() => ringEl.classList.add("open"));
+    updateHot();
+    setHint();
+  }
+  function switchMode(mode) {
+    if (!ring.open || mode === ring.mode) return;
+    ring.mode = mode;
+    ring.items = itemsFor(drag.name, mode);
+    ring.hot = -2;
+    drawRing();
+    updateHot();
+  }
+  function closeRing() {
+    ring.open = false;
+    ringEl.classList.remove("open");
+    setHint();
+  }
+  function updateHot() {
+    if (!ring.open) return;
+    const hit = hitTest(pointer.x - ring.x, pointer.y - ring.y, ring.items.length);
+    if (hit !== ring.hot) { ring.hot = hit; drawRing(); }
+    // Sliding over the bar switches rings (how touch users switch).
+    const bar = ringEl.querySelector(".modes");
+    if (bar) {
+      const dr = desk.getBoundingClientRect();
+      for (const s of bar.children) {
+        const b = s.getBoundingClientRect();
+        const x = pointer.x + dr.left, y = pointer.y + dr.top;
+        if (x >= b.left && x <= b.right && y >= b.top - 4 && y <= b.bottom + 4) { switchMode(s.dataset.mode); break; }
+      }
+    }
+  }
+
+  // ---------- Dragging ----------
+  let drag = null, ghost = null, pointer = { x: 0, y: 0 }, autoOpen = 0;
+
+  function localPoint(e) { const r = desk.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+  function startDrag(e, name, el) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    drag = { name, el, startX: e.clientX, startY: e.clientY, moved: false };
+    pointer = localPoint(e);
+  }
+
+  window.addEventListener("pointermove", e => {
+    if (!drag) return;
+    pointer = localPoint(e);
+    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 5) {
+      drag.moved = true;
+      drag.el.classList.add("dragging");
+      ghost = document.createElement("div");
+      ghost.className = "ghost";
+      ghost.setAttribute("style", thumbStyle(drag.name));
+      ghost.innerHTML = thumbInner(drag.name);
+      desk.appendChild(ghost);
+      setHint();
+      if (touch) autoOpen = setTimeout(() => { if (drag && !ring.open) openRing("convert"); }, 260);
+    }
+    if (ghost) { ghost.style.left = pointer.x + "px"; ghost.style.top = pointer.y + "px"; }
+    updateHot();
+  });
+
+  window.addEventListener("pointerup", () => {
+    if (!drag) return;
+    clearTimeout(autoOpen);
+    const item = ring.open && ring.hot >= 0 ? ring.items[ring.hot] : null;
+    const name = drag.name;
+    drag.el.classList.remove("dragging");
+    ghost && ghost.remove();
+    ghost = null;
+    if (ring.open) closeRing();
+    drag = null;
+    setHint();
+    if (item && !item.disabled) run(item, name);
+  });
+
+  const KEYMODE = { Shift: "convert", Control: "tools", Alt: "actions" };
+  window.addEventListener("keydown", e => {
+    if (!drag || !drag.moved) return;
+    if (e.key === "Escape") { closeRing(); return; }
+    const mode = KEYMODE[e.key];
+    if (!mode || e.repeat) return;
+    e.preventDefault();
+    ring.open ? switchMode(mode) : openRing(mode);
+  });
+  // Alt would focus the browser menu on release.
+  window.addEventListener("keyup", e => { if (e.key === "Alt" && drag) e.preventDefault(); });
+
+  // ---------- Results ----------
+  const toastEl = document.getElementById("toast");
+  let toastTimer = 0;
+  function toast(title, text) {
+    document.getElementById("toast-title").textContent = title;
+    document.getElementById("toast-text").textContent = text;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
+  }
+
+  function run(item, name) {
+    const [base, ext] = splitName(name);
+    if (item.target) {
+      const out = `${base}.${item.target}`;
+      addFile(out);
+      toast(`${name}  →  ${item.label}`, `${t("saved")} · ${out}`);
+      return;
+    }
+    const k = item.id;
+    const messages = { share: t("share"), shelf: t("shelf"), move: t("move"), terminal: t("terminal") };
+    if (k === "copypath") { try { navigator.clipboard.writeText("C:\\Users\\you\\Desktop\\" + name); } catch {} toast(item.label, t("pathcopied")); return; }
+    if (k === "copy") { toast(item.label, t("copiedfile")); return; }
+    if (messages[k]) { toast(item.label, messages[k]); return; }
+    if (k === "zip") { addFile(`${base}.zip`); toast(`${name}  →  Zip`, `${t("saved")} · ${base}.zip`); return; }
+    if (k === "unpack") { toast(item.label, t("saved")); return; }
+    const outExt = k === "frame" ? "png" : k === "compress" && ext === "wav" ? "flac" : ext;
+    const out = `${base}-${SUFFIX[k] || k}.${outExt}`;
+    addFile(out);
+    toast(`${name}  →  ${item.label}`, EDITORS.includes(k) ? `${t("editor")} · ${out}` : `${t("saved")} · ${out}`);
+  }
+
+  // ---------- Feature grid ----------
+  function buildFeatures() {
+    const g = document.getElementById("feature-grid");
+    const rows = [
+      ["images", "image", TARGETS.image.map(x => x.toUpperCase()).concat(TOOLSET.image.map(tool))],
+      ["video", "film", TARGETS.video.map(x => x.toUpperCase()).concat(TOOLSET.video.map(tool))],
+      ["audio", "music", TARGETS.audio.map(x => x.toUpperCase()).concat(TOOLSET.audio.map(tool))],
+      ["pdf", "doc", ["PNG", "JPG", "WEBP", "TIFF", "TXT (OCR)"].concat(TOOLSET.pdf.map(tool))],
+      ["docs", "doc", ["DOCX", "PDF", "ODT", "RTF", "HTML", "MD", "EPUB", "PPTX", "MP4"]],
+      ["more", "grid", ["XLSX", "CSV", "JSON", "ODS", "SRT", "VTT", "ASS", "ZIP", "7Z", "TAR.GZ"]]
+    ];
+    g.innerHTML = rows.map(([k, icon, chips]) =>
+      `<div class="feature"><h3><i>${svgIcon(icon)}</i>${t("f." + k)}</h3><p>${t("f." + k + ".t")}</p><div class="chips">${chips.map(c => `<span>${c}</span>`).join("")}</div></div>`).join("");
+  }
+
+  // ---------- winget copy ----------
+  const wg = document.getElementById("winget");
+  wg.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText("winget install KaanBahaSever.Poppy"); } catch {}
+    wg.innerHTML = `<span class="copied">${t("copied")}</span>`;
+    setTimeout(() => wg.textContent = "winget install KaanBahaSever.Poppy", 1600);
+  });
+
+  renderFiles();
+  applyLang();
+  window.__poppy = { ring, itemsFor }; // handy for checking the demo from the console
+})();
+</script>
+</body>
+</html>

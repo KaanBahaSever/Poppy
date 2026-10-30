@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://kaanbahasever.github.io/Poppy/"><b>kaanbahasever.github.io/Poppy</b></a> · try the ring in your browser<br><br>
   <b>Poppy</b> is a ring of file tools that opens under your cursor while you drag a file in Windows.<br>
   Convert, compress, trim, crop, merge, share and more, without opening an app.
 </p>
