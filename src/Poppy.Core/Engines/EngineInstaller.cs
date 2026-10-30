@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Poppy.Core.Engines;
 
@@ -10,7 +12,7 @@ namespace Poppy.Core.Engines;
 public sealed record EngineInfo(string Id, string Name, string PurposeKey, string Size, string? WingetId, string? StoreId, string Page, Func<bool> IsInstalled)
 {
     public string Purpose => L.T(PurposeKey);
-    public bool CanAutoInstall => WingetId != null || Id == "ocr";
+    public bool CanAutoInstall => WingetId != null || Id is "ocr" or "ghostscript";
 }
 
 public sealed record InstallResult(bool Ok, string Message);
@@ -29,7 +31,7 @@ public static class EngineInstaller
         new("7zip", "7-Zip", "eng.7zip", "≈ 2 MB", "7zip.7zip", null, "https://www.7-zip.org/", () => Engines.SevenZip != null),
         new("heic", "HEVC Video Extensions", "eng.hevc", "≈ 2 MB", null, "9NMZLZ57R3T7", "ms-windows-store://pdp/?ProductId=9NMZLZ57R3T7", () => Ops.WicImaging.CanEncodeHeic),
         new("ocr", "Windows OCR", "eng.ocr", "≈ 20 MB", null, null, "ms-settings:regionlanguage", () => Ops.PdfOps.OcrAvailable),
-        new("ghostscript", "Ghostscript", "eng.gs", "≈ 60 MB", null, null, "https://ghostscript.com/releases/gsdnld.html", () => Engines.Ghostscript != null),
+        new("ghostscript", "Ghostscript", "eng.gs", "≈ 65 MB", null, null, "https://ghostscript.com/releases/gsdnld.html", () => Engines.Ghostscript != null),
     ];
 
     public static EngineInfo? Get(string? id) => All.FirstOrDefault(e => e.Id == id);
@@ -69,6 +71,7 @@ public static class EngineInstaller
             if (e.IsInstalled()) return new(true, L.F("inst.done", e.Name));
             if (e.WingetId != null) return await ViaWinget(e, status, ct);
             if (e.Id == "ocr") return await InstallOcr(e, status);
+            if (e.Id == "ghostscript") return await InstallGhostscript(e, status, ct);
             OpenPage(e.Page);
             return new(false, e.StoreId != null ? L.T("inst.store") : L.T("inst.page"));
         }
@@ -126,6 +129,95 @@ public static class EngineInstaller
         if (e.IsInstalled()) return new(true, L.F("inst.done", e.Name));
         OpenPage(e.Page);
         return new(false, L.F("inst.failed", e.Name));
+    }
+
+    // ---------- Ghostscript (not on winget): the signed installer from Artifex's own GitHub ----------
+
+    public const string GhostscriptRepo = "ArtifexSoftware/ghostpdl-downloads";
+
+    static readonly HttpClient Http = CreateHttp();
+
+    static HttpClient CreateHttp()
+    {
+        var h = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
+        h.DefaultRequestHeaders.UserAgent.ParseAdd("Poppy");
+        return h;
+    }
+
+    /// <summary>Name and URL of the newest 64-bit Windows installer Artifex has published.</summary>
+    public static async Task<(string Name, string Url)?> LatestGhostscriptAsync(CancellationToken ct)
+    {
+        var json = await Http.GetStringAsync($"https://api.github.com/repos/{GhostscriptRepo}/releases/latest", ct);
+        using var doc = JsonDocument.Parse(json);
+        foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+        {
+            var name = a.GetProperty("name").GetString() ?? "";
+            if (Regex.IsMatch(name, @"^gs\d+w64\.exe$"))
+                return (name, a.GetProperty("browser_download_url").GetString()!);
+        }
+        return null;
+    }
+
+    static async Task<InstallResult> InstallGhostscript(EngineInfo e, Action<string>? status, CancellationToken ct)
+    {
+        status?.Invoke(L.T("inst.prepare"));
+        (string Name, string Url)? asset;
+        try { asset = await LatestGhostscriptAsync(ct); }
+        catch (HttpRequestException) { asset = null; }
+        if (asset == null)
+        {
+            OpenPage(e.Page);
+            return new(false, L.T("inst.page"));
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "Poppy", "installers");
+        Directory.CreateDirectory(dir);
+        var file = Path.Combine(dir, asset.Value.Name);
+        try
+        {
+            using (var response = await Http.GetAsync(asset.Value.Url, HttpCompletionOption.ResponseHeadersRead, ct))
+            {
+                response.EnsureSuccessStatusCode();
+                var total = response.Content.Headers.ContentLength ?? 0;
+                await using var src = await response.Content.ReadAsStreamAsync(ct);
+                await using var dst = File.Create(file);
+                var buffer = new byte[81920];
+                long done = 0;
+                int read, lastPct = -1;
+                while ((read = await src.ReadAsync(buffer, ct)) > 0)
+                {
+                    await dst.WriteAsync(buffer.AsMemory(0, read), ct);
+                    done += read;
+                    var pct = total > 0 ? (int)(done * 100 / total) : 0;
+                    if (pct / 5 != lastPct / 5) { lastPct = pct; status?.Invoke(L.F("inst.downloadpct", pct)); }
+                }
+            }
+
+            // Never run something that Artifex did not sign.
+            if (!Authenticode.IsSignedBy(file, "Artifex")) return new(false, L.T("inst.badsig"));
+
+            status?.Invoke(L.T("inst.admin"));
+            try
+            {
+                using var p = Process.Start(new ProcessStartInfo(file, "/S") { UseShellExecute = true, Verb = "runas" });
+                if (p != null) await p.WaitForExitAsync(ct);
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return new(false, L.T("inst.declined"));
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            return new(false, L.F("inst.failed", e.Name) + " · " + ex.Message);
+        }
+        finally
+        {
+            try { File.Delete(file); } catch { }
+        }
+
+        Engines.Refresh();
+        return e.IsInstalled() ? new(true, L.F("inst.done", e.Name)) : new(false, L.F("inst.failed", e.Name));
     }
 
     static void OpenPage(string url)

@@ -83,7 +83,7 @@ public static class OutputPaths
 }
 
 /// <summary>Orders "photo2" before "photo10", the way File Explorer does.</summary>
-public sealed class NaturalComparer : IComparer<string>
+public sealed class NaturalComparer : IComparer<string?>
 {
     public static readonly NaturalComparer Instance = new();
 

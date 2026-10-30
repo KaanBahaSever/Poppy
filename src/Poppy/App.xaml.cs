@@ -10,8 +10,11 @@ namespace Poppy;
 
 public partial class App : Application
 {
-    const string MutexName = @"Local\Poppy.SingleInstance";
-    const string ShowEventName = @"Local\Poppy.ShowSettings";
+    // POPPY_INSTANCE gives test and development copies their own instance, so they never talk to
+    // (or get mistaken for) the Poppy the user has installed.
+    static readonly string InstanceSuffix = Environment.GetEnvironmentVariable("POPPY_INSTANCE") is { Length: > 0 } i ? "." + i : "";
+    static readonly string MutexName = @"Local\Poppy.SingleInstance" + InstanceSuffix;
+    static readonly string ShowEventName = @"Local\Poppy.ShowSettings" + InstanceSuffix;
 
     internal static AppSettings Settings { get; private set; } = new();
     internal static App Current2 => (App)Current;
@@ -202,6 +205,37 @@ public partial class App : Application
         return await InstallEngineAsync(engine);
     }
 
+    /// <summary>
+    /// Engines Poppy can install by itself that are not here yet. LibreOffice only counts for
+    /// people without Microsoft Office; the paid HEVC extension never does.
+    /// </summary>
+    internal static List<Poppy.Core.Engines.EngineInfo> MissingEngines()
+    {
+        var office = Poppy.Core.Engines.Engines.Word || Poppy.Core.Engines.Engines.PowerPoint || Poppy.Core.Engines.Engines.Excel;
+        return Poppy.Core.Engines.EngineInstaller.All
+            .Where(e => e.CanAutoInstall && !e.IsInstalled() && !(e.Id == "libreoffice" && office))
+            .ToList();
+    }
+
+    bool installingAll;
+
+    /// <summary>One click: installs every missing engine, one after another.</summary>
+    internal async Task InstallMissingAsync()
+    {
+        if (installingAll) return;
+        installingAll = true;
+        try
+        {
+            foreach (var e in MissingEngines()) await InstallEngineAsync(e);
+        }
+        finally
+        {
+            installingAll = false;
+            RebuildTrayMenu();
+            main?.Refresh();
+        }
+    }
+
     internal async Task<bool> InstallEngineAsync(Poppy.Core.Engines.EngineInfo engine)
     {
         var card = jobs.Add(engine.Name, null);
@@ -272,6 +306,9 @@ public partial class App : Application
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(L.T("tray.open"), null, (_, _) => ShowMain());
         menu.Items.Add(L.T("tray.shelf"), null, (_, _) => GetShelf().ShowNearCursor());
+        var missing = MissingEngines();
+        if (missing.Count > 0)
+            menu.Items.Add(L.F("tray.engines", missing.Count), null, async (_, _) => await InstallMissingAsync());
         var pause = new Forms.ToolStripMenuItem(L.T("tray.pause")) { Checked = hooks.Paused, CheckOnClick = true };
         pause.CheckedChanged += (_, _) => hooks.Paused = pause.Checked;
         menu.Items.Add(pause);

@@ -1,9 +1,7 @@
-Poppy 1.0.2 🌺
+Poppy 1.0.3 🌺
 
-- **Engines install themselves.** Drop a file on a greyed-out petal (for example DOCX → PDF without Office) and Poppy offers to install what it needs, then carries on with your file. Settings → Engines has an Install button for each one and "Install everything missing".
-- **Split PDFs your way:** every page, every few pages, or custom ranges like `1-3, 4-6, 7-`.
-- **Merge PDFs in name order** (part2 before part10), like several images already do.
-- **Job cards:** the buttons now really respond to clicks, file thumbnails show up, and there is a new **Open** button next to Show in folder.
-- Fixed wrong winget ids for optional engines (Ghostscript is not on winget; its download page opens instead).
+- **One click for every engine.** "Install all" now also covers Ghostscript: Poppy downloads Artifex's official installer from their GitHub, checks that it is signed by Artifex, and installs it silently. Only the paid HEVC extension still goes through the Store.
+- **You can't miss it:** a banner on the start page and an "Install engines" item in the tray menu appear whenever something can be added.
+- Test and development copies of Poppy can no longer interfere with the Poppy you have installed.
 
 Installed from Setup.exe? Poppy updates itself the next time it exits.

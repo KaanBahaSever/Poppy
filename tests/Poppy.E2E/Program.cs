@@ -117,9 +117,17 @@ static class Program
         Directory.CreateDirectory(settingsDir);
         File.WriteAllText(Path.Combine(settingsDir, "settings.json"),
             """{ "FirstRunDone": true, "StartWithWindows": false, "PlaySound": false, "Language": "en" }""");
-        foreach (var p in Process.GetProcessesByName("Poppy")) { try { p.Kill(); p.WaitForExit(3000); } catch { } }
+        // Never touch the user's own Poppy; but two copies would both open a ring, so stop here.
+        var others = Process.GetProcessesByName("Poppy").Where(p => !string.Equals(SafePath(p), poppyExe, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (others.Count > 0)
+        {
+            Log("Another Poppy is running (" + SafePath(others[0]) + "). Quit it from the tray, then run the E2E test again.");
+            return 3;
+        }
+        foreach (var p in Process.GetProcessesByName("Poppy")) { try { p.Kill(); p.WaitForExit(3000); } catch { } } // a leftover of this build
         var psi = new ProcessStartInfo(poppyExe, "--background") { UseShellExecute = false };
         psi.Environment["POPPY_SETTINGS_DIR"] = settingsDir;
+        psi.Environment["POPPY_INSTANCE"] = "e2e";
         using var app = Process.Start(psi)!;
         try
         {
@@ -290,6 +298,11 @@ static class Program
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+
+    static string? SafePath(Process p)
+    {
+        try { return p.MainModule?.FileName; } catch { return null; }
+    }
 
     static void Scenario(string name, Action act, Func<bool> check)
     {

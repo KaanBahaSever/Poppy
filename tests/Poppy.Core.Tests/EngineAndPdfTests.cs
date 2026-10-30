@@ -146,6 +146,40 @@ public class EngineInstallTests
     }
 
     [Fact]
+    public void SignatureCheckAcceptsOnlyTheRightPublisher()
+    {
+        // dotnet.exe carries an embedded Microsoft Authenticode signature on every machine that runs these tests.
+        var dotnet = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "dotnet.exe");
+        if (!File.Exists(dotnet)) dotnet = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
+        Assert.True(Authenticode.IsSignedBy(dotnet, "Microsoft"));
+        Assert.False(Authenticode.IsSignedBy(dotnet, "Artifex"));
+
+        var fake = Path.Combine(Path.GetTempPath(), "PoppyTests", "unsigned-" + Guid.NewGuid().ToString("N")[..6] + ".exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(fake)!);
+        File.WriteAllBytes(fake, File.ReadAllBytes(dotnet)[..4096]); // a broken copy: no valid signature
+        Assert.False(Authenticode.IsSignedBy(fake, "Microsoft"));
+        Assert.False(Authenticode.IsSignedBy(Path.Combine(Path.GetTempPath(), "does-not-exist.exe"), "Microsoft"));
+    }
+
+    [Fact]
+    public async Task GhostscriptInstallerIsFoundOnArtifexGitHub()
+    {
+        if (Environment.GetEnvironmentVariable("CI") != null) return; // keep CI off the GitHub API rate limit
+        var asset = await EngineInstaller.LatestGhostscriptAsync(default);
+        Assert.NotNull(asset);
+        Assert.Matches(@"^gs\d+w64\.exe$", asset.Value.Name);
+        Assert.StartsWith($"https://github.com/{EngineInstaller.GhostscriptRepo}/releases/download/", asset.Value.Url);
+    }
+
+    [Fact]
+    public void GhostscriptIsNowOneClick()
+    {
+        var gs = EngineInstaller.Get("ghostscript")!;
+        Assert.True(gs.CanAutoInstall);
+        Assert.False(EngineInstaller.Get("heic")!.CanAutoInstall); // paid Store extension: the user buys it
+    }
+
+    [Fact]
     public void RefreshFindsEnginesAgain()
     {
         var before = Engines.Engines.Pandoc;

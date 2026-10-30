@@ -81,6 +81,50 @@ sealed class MainWindow : Window
         };
     }
 
+    /// <summary>Re-reads engine state (after installs) and redraws the current page.</summary>
+    public void Refresh() => Navigate(current);
+
+    /// <summary>"3 engines missing: FFmpeg, Pandoc, 7-Zip. [Install all] [Details]" or null when nothing is.</summary>
+    UIElement? MissingBanner()
+    {
+        var missing = App.MissingEngines();
+        if (missing.Count == 0) return null;
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(new TextBlock { Text = "\uE896", FontFamily = Icons, FontSize = 20, Foreground = Brush(Accent), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) });
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(new TextBlock { Text = L.F("banner.title", missing.Count), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Brush(Theme.Text) });
+        text.Children.Add(new TextBlock { Text = L.F("banner.body", string.Join(", ", missing.Select(e => e.Name))), FontSize = 13, Foreground = Brush(SubText), TextWrapping = TextWrapping.Wrap });
+        Grid.SetColumn(text, 1);
+        row.Children.Add(text);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        var install = new Button { Content = L.T("banner.install"), Style = Styles.Primary };
+        install.Click += async (_, _) =>
+        {
+            install.IsEnabled = false;
+            install.Content = L.T("eng.installing");
+            await App.Current2.InstallMissingAsync();
+        };
+        var more = new Button { Content = L.T("banner.more"), Style = Styles.Ghost, Margin = new Thickness(6, 0, 0, 0) };
+        more.Click += (_, _) => Navigate("engines");
+        buttons.Children.Add(install);
+        buttons.Children.Add(more);
+        Grid.SetColumn(buttons, 2);
+        row.Children.Add(buttons);
+        return new Border
+        {
+            Child = row,
+            Background = Brush(Dark ? Color.FromArgb(0x30, 0xFF, 0x5A, 0x36) : Color.FromRgb(0xFF, 0xF1, 0xEB)),
+            BorderBrush = Brush(Dark ? Color.FromArgb(0x60, 0xFF, 0x5A, 0x36) : Color.FromRgb(0xFF, 0xD3, 0xC4)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(18, 14, 14, 14),
+            Margin = new Thickness(0, 0, 0, 22),
+        };
+    }
+
     void AddNav(string id, string glyph, string text)
     {
         var active = id == current;
@@ -121,6 +165,8 @@ sealed class MainWindow : Window
     UIElement HowPage()
     {
         var s = new StackPanel();
+        var banner = MissingBanner();
+        if (banner != null) s.Children.Add(banner);
         s.Children.Add(H1(L.T("how.title")));
         s.Children.Add(P(L.T("how.lead")));
 
@@ -261,16 +307,15 @@ sealed class MainWindow : Window
         s.Children.Add(P(L.T("eng.lead")));
 
         var office = E.Word || E.PowerPoint || E.Excel;
-        // LibreOffice is only "missing" for people without Microsoft Office.
-        var missing = EngineInstaller.All.Where(e => e.CanAutoInstall && !e.IsInstalled() && !(e.Id == "libreoffice" && office)).ToList();
+        var missing = App.MissingEngines();
         if (missing.Count > 0)
         {
             var all = new Button { Content = L.T("eng.installall") + $" ({missing.Count})", Style = Styles.Primary, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
             all.Click += async (_, _) =>
             {
                 all.IsEnabled = false;
-                foreach (var e in missing) await App.Current2.InstallEngineAsync(e);
-                Navigate("engines");
+                all.Content = L.T("eng.installing");
+                await App.Current2.InstallMissingAsync();
             };
             s.Children.Add(all);
         }
