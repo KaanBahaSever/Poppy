@@ -15,7 +15,8 @@ public sealed record EngineInfo(string Id, string Name, string PurposeKey, strin
     public bool CanAutoInstall => WingetId != null || Id is "ocr" or "ghostscript";
 }
 
-public sealed record InstallResult(bool Ok, string Message);
+/// <param name="HandedOff">Not a failure: a Store or download page was opened for the user to finish.</param>
+public sealed record InstallResult(bool Ok, string Message, bool HandedOff = false);
 
 /// <summary>
 /// Installs engines so people never have to open a terminal: winget for regular programs, the
@@ -73,7 +74,7 @@ public static class EngineInstaller
             if (e.Id == "ocr") return await InstallOcr(e, status);
             if (e.Id == "ghostscript") return await InstallGhostscript(e, status, ct);
             OpenPage(e.Page);
-            return new(false, e.StoreId != null ? L.T("inst.store") : L.T("inst.page"));
+            return new(false, e.StoreId != null ? L.T("inst.store") : L.T("inst.page"), HandedOff: true);
         }
         finally
         {
@@ -87,7 +88,7 @@ public static class EngineInstaller
         if (winget == null)
         {
             OpenPage(e.Page);
-            return new(false, L.T("inst.nowinget"));
+            return new(false, L.T("inst.nowinget"), HandedOff: true);
         }
         status?.Invoke(L.T("inst.prepare"));
         var r = await ProcessRunner.RunAsync(winget, WingetArgs(e.WingetId!), line =>
@@ -167,7 +168,7 @@ public static class EngineInstaller
         if (asset == null)
         {
             OpenPage(e.Page);
-            return new(false, L.T("inst.page"));
+            return new(false, L.T("inst.page"), HandedOff: true);
         }
 
         var dir = Path.Combine(Path.GetTempPath(), "Poppy", "installers");

@@ -103,15 +103,28 @@ public partial class App : Application
         hooks.Start();
         CreateTray();
 
-        if (!AutoStart.IsPackaged)
-            _ = Task.Delay(TimeSpan.FromSeconds(30)).ContinueWith(_ => Program.CheckForUpdatesAsync(), TaskScheduler.Default);
+        Updates = new Updater();
+        Updates.Changed += OnUpdateChanged;
+        if (Updates.Current != Updater.State.Unsupported)
+        {
+            // Right away (once the UI is idle), then every few hours for people who never quit.
+            Dispatcher.BeginInvoke(async () => await Updates.CheckAsync(), DispatcherPriority.ApplicationIdle);
+            var every = new DispatcherTimer { Interval = TimeSpan.FromHours(4) };
+            every.Tick += async (_, _) => await Updates.CheckAsync();
+            every.Start();
+        }
 
         var background = e.Args.Contains("--background");
+        // Every launch, not just the first: re-points the startup entry if Poppy moved and puts it
+        // back if something removed it. Turning the setting off removes it.
+        // Only installed copies (Setup.exe or Store), so a development build never takes the entry over.
+        var installed = Updates.Current != Updater.State.Unsupported || AutoStart.IsPackaged;
+        if (Settings.StartWithWindows && installed && InstanceSuffix.Length == 0) _ = SafeStartup(true);
+
         if (!Settings.FirstRunDone)
         {
             Settings.FirstRunDone = true;
             Settings.Save();
-            if (Settings.StartWithWindows) _ = SafeStartup(true);
             ShowMain();
         }
         else if (!background)
@@ -246,7 +259,13 @@ public partial class App : Application
         {
             var r = await Poppy.Core.Engines.EngineInstaller.InstallAsync(engine, s => Dispatcher.BeginInvoke(() => card.SetStatus(s)), cts.Token);
             if (r.Ok) card.Finish(r.Message, []);
+            else if (r.HandedOff)
+            {
+                card.Finish(r.Message, []);
+                WatchForInstall(engine);
+            }
             else card.Fail(r.Message);
+            RebuildTrayMenu();
             return r.Ok;
         }
         catch (OperationCanceledException)
@@ -309,6 +328,8 @@ public partial class App : Application
         var missing = MissingEngines();
         if (missing.Count > 0)
             menu.Items.Add(L.F("tray.engines", missing.Count), null, async (_, _) => await InstallMissingAsync());
+        if (Updates?.Current == Updater.State.Ready)
+            menu.Items.Add(L.F("tray.update", Updates.ReadyVersion ?? ""), null, (_, _) => Updates.RestartNow());
         var pause = new Forms.ToolStripMenuItem(L.T("tray.pause")) { Checked = hooks.Paused, CheckOnClick = true };
         pause.CheckedChanged += (_, _) => hooks.Paused = pause.Checked;
         menu.Items.Add(pause);
@@ -317,8 +338,53 @@ public partial class App : Application
         tray.ContextMenuStrip = menu;
     }
 
+    /// <summary>
+    /// After sending the user to the Store or a download page, notice when the engine shows up
+    /// (no restart needed) and say so.
+    /// </summary>
+    void WatchForInstall(Poppy.Core.Engines.EngineInfo engine)
+    {
+        var until = DateTime.UtcNow.AddMinutes(20);
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        timer.Tick += async (_, _) =>
+        {
+            timer.Stop();
+            var found = await Task.Run(() =>
+            {
+                Poppy.Core.Engines.Engines.Refresh();
+                return engine.IsInstalled();
+            });
+            if (found)
+            {
+                jobs.Flash(engine.Name, L.F("inst.done", engine.Name));
+                RebuildTrayMenu();
+                main?.Refresh();
+            }
+            else if (DateTime.UtcNow < until) timer.Start();
+        };
+        timer.Start();
+    }
+
+    // ---------- Updates ----------
+
+    internal Updater Updates { get; private set; } = null!;
+    bool offeredUpdate;
+
+    void OnUpdateChanged()
+    {
+        RebuildTrayMenu();
+        main?.Refresh();
+        if (Updates.Current == Updater.State.Ready && !offeredUpdate)
+        {
+            offeredUpdate = true;
+            jobs.Add(L.F("upd.ready", Updates.ReadyVersion ?? ""), null)
+                .Offer(L.T("upd.offer"), L.T("upd.restart"), Updates.RestartNow);
+        }
+    }
+
     internal void Quit()
     {
+        Updates?.ApplyOnExit();
         hooks.Dispose();
         if (tray != null) { tray.Visible = false; tray.Dispose(); }
         Shutdown();
@@ -326,6 +392,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Updates?.ApplyOnExit(); // also when Windows shuts down or signs out
         hooks?.Dispose();
         tray?.Dispose();
         mutex?.Dispose();

@@ -1,7 +1,10 @@
-Poppy 1.0.3 🌺
+Poppy 1.0.4 🌺
 
-- **One click for every engine.** "Install all" now also covers Ghostscript: Poppy downloads Artifex's official installer from their GitHub, checks that it is signed by Artifex, and installs it silently. Only the paid HEVC extension still goes through the Store.
-- **You can't miss it:** a banner on the start page and an "Install engines" item in the tray menu appear whenever something can be added.
-- Test and development copies of Poppy can no longer interfere with the Poppy you have installed.
+- **Updates arrive reliably.** Poppy checks right after it starts (and every few hours), downloads in the background, then shows "Poppy x.y.z is ready · Restart". Quitting also installs it. About shows your version and a "Check for updates" button.
+- **Much smaller updates:** from now on only the changed parts are downloaded (delta packages) instead of the whole 200 MB app.
+- **HEIC saving works.** A bug kept Poppy from using the HEVC extension even when it was installed. When you install an engine from the Store, Poppy now notices by itself, with no restart.
+- Opening the Store or a download page is no longer reported as an error.
+- The left menu is aligned.
+- "Start with Windows" repairs its startup entry if it ever goes missing.
 
-Installed from Setup.exe? Poppy updates itself the next time it exits.
+Installed from Setup.exe? Poppy updates itself the next time it exits. This is the last large download: later updates are deltas.

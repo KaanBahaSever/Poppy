@@ -188,6 +188,26 @@ sealed class JobCard
         CloseAfter(TimeSpan.FromSeconds(5));
     }
 
+    /// <summary>A message with one action button ("Restart"); stays until used or closed.</summary>
+    public void Offer(string message, string action, Action onClick)
+    {
+        running = false;
+        bar.Visibility = Visibility.Collapsed;
+        status.Text = message;
+        var b = new Button
+        {
+            Content = action,
+            Style = Styles.Primary,
+            Padding = new Thickness(12, 4, 12, 5),
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        b.Click += (_, _) => onClick();
+        ((Panel)close.Parent).Children.Insert(0, b);
+        close.ToolTip = L.T("job.close");
+    }
+
     public void Fail(string message)
     {
         bar.Visibility = Visibility.Collapsed;

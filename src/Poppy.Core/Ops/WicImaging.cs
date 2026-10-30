@@ -62,11 +62,14 @@ public static class WicImaging
 
     static async Task<InMemoryRandomAccessStream> ToStream(byte[] data)
     {
+        // Not AsStreamForWrite(): disposing that wrapper also disposes the stream we hand on.
         var s = new InMemoryRandomAccessStream();
-        using (var w = s.AsStreamForWrite())
+        using (var writer = new DataWriter(s))
         {
-            await w.WriteAsync(data);
-            await w.FlushAsync();
+            writer.WriteBytes(data);
+            await writer.StoreAsync();
+            await writer.FlushAsync();
+            writer.DetachStream();
         }
         s.Seek(0);
         return s;

@@ -381,6 +381,31 @@ sealed class MainWindow : Window
         head.Children.Add(t);
         s.Children.Add(head);
 
+        // Version and updates.
+        var updates = App.Current2.Updates;
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        info.Children.Add(new TextBlock { Text = L.F("upd.version", updates.CurrentVersion), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Brush(Theme.Text) });
+        info.Children.Add(new TextBlock { Text = updates.Describe(), FontSize = 13, Foreground = Brush(SubText) });
+        row.Children.Add(info);
+        if (updates.Current == Updater.State.Ready)
+        {
+            var restart = new Button { Content = L.T("upd.restart"), Style = Styles.Primary };
+            restart.Click += (_, _) => updates.RestartNow();
+            Grid.SetColumn(restart, 1);
+            row.Children.Add(restart);
+        }
+        else if (updates.Current is Updater.State.Idle or Updater.State.UpToDate or Updater.State.Failed)
+        {
+            var check = new Button { Content = L.T("upd.check") };
+            check.Click += async (_, _) => await updates.CheckAsync();
+            Grid.SetColumn(check, 1);
+            row.Children.Add(check);
+        }
+        s.Children.Add(Card(row, 20));
+
         var body = new StackPanel();
         body.Children.Add(P(L.T("about.oss")));
         var links = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
@@ -388,7 +413,7 @@ sealed class MainWindow : Window
         links.Children.Add(Link(L.T("about.issues"), RepoUrl + "/issues"));
         links.Children.Add(Link(L.T("about.license"), RepoUrl + "/blob/main/LICENSE"));
         body.Children.Add(links);
-        s.Children.Add(Card(body, 20));
+        s.Children.Add(Card(body));
 
         var credits = new StackPanel();
         credits.Children.Add(H2(L.T("about.credits")));

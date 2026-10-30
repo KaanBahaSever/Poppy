@@ -19,6 +19,8 @@ jobs:
 
       - name: Build installer, update feed and Store package
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           ./build.ps1 -Version $version
@@ -29,8 +31,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
-          $files = Get-ChildItem artifacts/release -File | ForEach-Object FullName
-          gh release create $tag @files --title "Poppy $($tag.TrimStart('v'))" --notes-file docs/RELEASE_NOTES.md
+          $version = $tag.TrimStart('v')
+          # vpk publishes the installer, the full and delta packages and the update feed.
+          vpk upload github --repoUrl "https://github.com/${{ github.repository }}" --token $env:GH_TOKEN `
+            -o artifacts/release --tag $tag --releaseName "Poppy $version" --publish
+          if ($LASTEXITCODE -ne 0) { throw "vpk upload failed" }
+          gh release upload $tag (Get-ChildItem artifacts/release -Filter "*.msix").FullName --clobber
+          gh release edit $tag --notes-file docs/RELEASE_NOTES.md
 
       - name: Upload winget manifests
         uses: actions/upload-artifact@v4

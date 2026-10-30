@@ -16,7 +16,8 @@ param(
     [string]$Version = "1.0.0",
     [switch]$SkipFfmpeg,
     [switch]$SkipSetup,
-    [switch]$SkipMsix
+    [switch]$SkipMsix,
+    [switch]$NoDelta
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,6 +59,13 @@ if (-not $SkipFfmpeg) {
 if (-not $SkipSetup) {
     Write-Host "==> Creating installer (Velopack)" -ForegroundColor Cyan
     if (-not (Get-Command vpk -ErrorAction SilentlyContinue)) { dotnet tool install -g vpk | Out-Null }
+    if (-not $NoDelta) {
+        # With the previous release next to it, vpk pack also makes a delta package, so updates
+        # download only what changed instead of the whole app.
+        $token = if ($env:GH_TOKEN) { @("--token", $env:GH_TOKEN) } else { @() }
+        vpk download github --repoUrl "https://github.com/$repo" -o $release @token
+        if ($LASTEXITCODE -ne 0) { Write-Warning "No previous release found: full package only." }
+    }
     vpk pack --packId Poppy --packVersion $Version --packDir $publish --mainExe Poppy.exe `
         --packTitle Poppy --packAuthors "Kaan Baha Sever" --icon (Join-Path $root "src/Poppy/Assets/Poppy.ico") `
         --outputDir $release
